@@ -37,7 +37,7 @@ flujos de trabajo del desarrollo de software.
 
 #### Diseño
 
-- Consultar sobre ideas de diseño, como el uso de patrones o buenas prácticas de desarrollo.
+- Responder consultas sobre ideas de diseño, como el uso de patrones o buenas prácticas de desarrollo.
 - Realizar sugerencias de corrección o modificación a partir de modelos ya diseñados.
 - Crear pruebas de concepto para validar diseños realizados.
 - Crear la estructura de carpetas, clases, DTOs, etc., a partir de un diseño de arquitectura ya definido.
@@ -53,7 +53,7 @@ flujos de trabajo del desarrollo de software.
 
 #### Pruebas
 
-- Consultar sobre buenas prácticas en el diseño e implementación de casos de prueba.
+- Responder consultas sobre buenas prácticas en el diseño e implementación de casos de prueba.
 - Realizar sugerencias de corrección o modificación de diseño e implementación de pruebas.
 - Generar pruebas unitarias a partir de una colección de casos de prueba previamente diseñados, o sin ellos.
 - Verificar la cobertura y la creación de pruebas unitarias que validen funcionalidad real (no pruebas triviales o
@@ -64,6 +64,7 @@ flujos de trabajo del desarrollo de software.
 - Apoyar en la revisión, corrección y sugerencia de cambios en los documentos de arquitectura, en los *prompts*, en los
   agentes y en la definición de *specs* que serán procesados por IA.
 - Generar *commits* y *PRs* a partir de los cambios realizados en el código fuente.
+- Generar documentación del código fuente.
 
 #### Auditoría de IA
 
