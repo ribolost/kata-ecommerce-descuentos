@@ -29,7 +29,7 @@ describe('errorResponseInterceptor', () => {
     let capturedError: ApiError | undefined;
 
     http.get('/api/orders').subscribe({
-      next: () => {},
+      next: () => { /* empty */ },
       error: (error: ApiError) => (capturedError = error),
     });
 
