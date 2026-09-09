@@ -3,9 +3,6 @@ package com.ribolost.pruebastecnicas.kataecommerce.checkout.order.application.dt
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
-/**
- * DTO de entrada: línea de carrito (ver contrato OpenAPI: CartItemRequest).
- */
 public record CartItemRequest(
 
         @NotBlank(message = "productId es obligatorio")

@@ -35,14 +35,16 @@ public class CheckoutController {
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CartRequest cartRequest) {
-        // TODO: construir la URI de ubicación del recurso creado (Location header).
+        // construir Location header con el id devuelto
         OrderResponse orderResponse = placeOrderUseCase.placeOrder(cartRequest);
-        return ResponseEntity.created(URI.create("/api/orders/")).body(orderResponse);
+        return ResponseEntity.created(URI.create("/api/orders/" + orderResponse.id())).body(orderResponse);
     }
 
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable String orderId) {
-        // TODO: mapear Order -> OrderResponse y devolver 404 (OrderNotFoundException) si no existe.
-        throw new UnsupportedOperationException("Pendiente de implementación");
+        return orderRepository.findById(orderId)
+                .map(OrderResponse::from)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
