@@ -7,15 +7,13 @@ public class DiscountPolicy {
 
     private String id;
     private List<DiscountRuleDefinition> rules = new ArrayList<>();
-    private List<Coupon> coupons = new ArrayList<>();
 
     public DiscountPolicy() {
     }
 
-    public DiscountPolicy(String id, List<DiscountRuleDefinition> rules, List<Coupon> coupons) {
+    public DiscountPolicy(String id, List<DiscountRuleDefinition> rules) {
         this.id = id;
         this.rules = rules;
-        this.coupons = coupons;
     }
 
     public String getId() {
@@ -32,13 +30,5 @@ public class DiscountPolicy {
 
     public void setRules(List<DiscountRuleDefinition> rules) {
         this.rules = rules;
-    }
-
-    public List<Coupon> getCoupons() {
-        return coupons;
-    }
-
-    public void setCoupons(List<Coupon> coupons) {
-        this.coupons = coupons;
     }
 }

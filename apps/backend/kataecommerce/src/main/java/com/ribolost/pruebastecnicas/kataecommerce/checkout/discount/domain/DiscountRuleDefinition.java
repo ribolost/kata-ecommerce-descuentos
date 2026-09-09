@@ -52,10 +52,18 @@ public class DiscountRuleDefinition {
         this.coupon = coupon;
     }
 
+    /**
+     * TOTAL representa el tope máximo de descuento (RN-04). Se nombra TOTAL
+     * (y no CAP) para que coincida exactamente con el valor que expone el
+     * contrato OpenAPI en AppliedDiscounts/DiscountType (arquitectura.md,
+     * "Contrato de API"), tanto para tipar la regla configurada en la
+     * DiscountPolicy como para reportar en appliedDiscounts que el tope fue
+     * alcanzado y aplicado.
+     */
     public enum DiscountType {
         CATEGORY,
         VOLUME,
         COUPON,
-        CAP
+        TOTAL
     }
 }

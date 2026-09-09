@@ -3,7 +3,11 @@ package com.ribolost.pruebastecnicas.kataecommerce.checkout.order.application.va
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
+import java.util.regex.Pattern;
+
 public class CouponCodeFormatValidator implements ConstraintValidator<ValidCouponCode, String> {
+
+    private static final Pattern COUPON_CODE_PATTERN = Pattern.compile("^[A-Za-z0-9]{4,20}$");
 
     @Override
     public void initialize(ValidCouponCode constraintAnnotation) {
@@ -12,7 +16,9 @@ public class CouponCodeFormatValidator implements ConstraintValidator<ValidCoupo
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        // TODO: definir y aplicar el formato esperado del código de cupón (RN-09).
-        return true;
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        return COUPON_CODE_PATTERN.matcher(value.trim()).matches();
     }
 }
