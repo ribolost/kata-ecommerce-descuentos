@@ -48,13 +48,6 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
-		<!-- MongoDB embebido -->
-		<dependency>
-			<groupId>de.flapdoodle.embed</groupId>
-			<artifactId>de.flapdoodle.embed.mongo.spring4x</artifactId>
-			<version>4.24.0</version>
-		</dependency>
-
 		<!-- Observabilidad -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
