@@ -9,7 +9,9 @@ Kata - Creación de eccomerce con descuentos acumulativos
 Comandos para correr:
 
 `npm install`
+
 `npm test`
-`npm test -- --filter="CartStateService" # una suite específica`
+
+`npm test -- --filter="CartStateService"` # una suite específica
 
 ### Backend
