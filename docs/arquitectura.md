@@ -144,3 +144,44 @@ Checkout -->|"uses"| Catalog
 - **DecrementStock**: reduce el stock de un producto en la cantidad solicitada; rechaza la operación si no hay stock suficiente. Es invocado por `PlaceOrder` a través de `ProductCatalogPort`.
 
 ---
+
+## 2. Arquitectura externa
+
+### 2.1 Visión general
+
+El backend se organiza como un **monolito modular**: una única aplicación desplegable, dividida en los Bounded Contexts `checkout` (con los paquetes internos `discount` y `order`) y `catalog`, cada uno con la organización interna que su complejidad exige. La relación entre `checkout` y `catalog` sigue el `Customer/Supplier` definido en el _Context Map_ (ver [Dominio](#1-dominio-ddd)): `checkout` consume las capacidades de `catalog`, sin acceder directamente a sus clases internas. El frontend es una unidad de despliegue independiente: se comunica con el backend exclusivamente por HTTP/REST, sin compartir proceso ni ciclo de despliegue con él.
+
+### 2.2 Backend
+
+Dos Bounded Contexts: `checkout`, dividido internamente en el paquete `order` (subdominio _Core_, orquestación de la compra, con arquitectura Hexagonal ligera) y el paquete `discount` (subdominio _Supporting_, motor de descuentos, en capas); y `catalog`, también en capas. La justificación de cada estilo arquitectónico y de la elección de monolito modular está en "Trade-offs y decisiones arquitectónicas".
+
+### 2.3 Frontend
+
+La aplicación Angular se organiza por Bounded Context: cada _Page_ de _Atomic Design_ corresponde a uno de los Bounded Contexts del dominio (`catalog`, `checkout`), sin acoplamiento cruzado más allá de interfaces bien definidas — el catálogo no necesita saber nada del carrito, y viceversa.
+
+El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el servidor para reducir el tiempo hasta la primera pintura, y la interacción del carrito se hidrata en el cliente una vez cargada la página. El detalle completo está en [Arquitectura interna](#32-frontend).
+
+### 2.4 Selección de tecnologías
+
+- **Angular 22.** Integra TypeScript como su lenguaje estándar, con tipado fuerte de punta a punta y detección de errores de contrato en tiempo de compilación. Es un framework integral: enrutamiento, formularios, cliente HTTP, inyección de dependencias y animaciones vienen incluidos, sin depender de que el equipo integre librerías externas para cada pieza. Soporta de forma nativa el renderizado en servidor y la federación de módulos, por lo que la eventual evolución hacia microfrontends no requiere cambiar de framework ni introducir herramientas adicionales.
+- **Java 21 / Spring Boot 4.1.x.** Spring Boot ofrece un ecosistema ya integrado para construir aplicaciones REST, seguras y desplegables en la nube (Spring Web, Spring Data, Spring Security, Spring Cloud), lo que evita ensamblar manualmente piezas sueltas para necesidades que la mayoría de backends terminan teniendo. Java aporta tipado fuerte y verificación en compilación. La migración futura hacia microservicios es de bajo costo dentro de este mismo ecosistema, y el lenguaje ofrece un modelo de concurrencia maduro y robusto, con buen rendimiento bajo alta carga de peticiones.
+- **MongoDB (no relacional).** El checkout de este sistema tiene un patrón de acceso de lectura/escritura frecuente sobre documentos autocontenidos (una orden con sus líneas y su desglose de descuentos, un producto con su stock) y no requiere transacciones multi-tabla ni integridad referencial estricta entre entidades — a diferencia de un módulo de pagos real, donde la integridad transaccional es el requisito no negociable, aquí lo crítico es la velocidad de lectura/escritura y que cada documento sea internamente consistente. Un modelo documental resuelve eso de forma más directa que uno relacional, sin joins ni normalización, y cada `Aggregate` se persiste como una única unidad coherente con su propio límite de consistencia. Al ser un monolito modular, se usa una única base de datos MongoDB compartida por ambos Bounded Contexts (cada uno con sus propias colecciones), no una base de datos por módulo.
+
+  2.5 Requerimientos no funcionales
+  Calidad y seguridad del código. El diseño sigue el principio de Security by design.
+  100% de tipado fuerte en backend y frontend — cero usos de tipos dinámicos o genéricos sin justificación técnica explícita, verificable con una herramienta de análisis estático como SonarQube.
+  Contratos de entrada tipados mediante DTOs y validados de forma declarativa (Bean Validation en backend, formularios tipados en frontend), de modo que un dato inválido o mal formado se rechace antes de llegar a la lógica de dominio.
+  Un agente de IA ejecuta las herramientas de análisis SAST (Static Application Security Testing), SCA (Software Composition Analysis) y Secret Scanning antes de integrar cambios, sin vulnerabilidades críticas ni secretos expuestos sin remediar.
+  Testabilidad, tanto en backend como en frontend.
+  Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio, no como techo — el proyecto puede ampliar la cobertura a otras capas sin restricción.
+  Casos de borde obligatorios: el tope del 35% de descuento superado, carritos vacíos o con datos corruptos, cupones no registrados o expirados, e intentos de compra con stock insuficiente.
+
+### 2.5 Requerimientos no funcionales
+
+- **Calidad y seguridad del código.** El diseño sigue el principio de _Security by design_.
+  - 100% de tipado fuerte en backend y frontend — cero usos de tipos dinámicos o genéricos sin justificación técnica explícita, verificable con una herramienta de análisis estático como SonarQube.
+  - Contratos de entrada tipados mediante DTOs y validados de forma declarativa (Bean Validation en backend, formularios tipados en frontend), de modo que un dato inválido o mal formado se rechace antes de llegar a la lógica de dominio.
+  - Un agente de _IA_ ejecuta las herramientas de análisis **SAST** (Static Application Security Testing), **SCA** (Software Composition Analysis) y _Secret Scanning_ antes de integrar cambios, sin vulnerabilidades críticas ni secretos expuestos sin remediar.
+- **Testabilidad**, tanto en backend como en frontend.
+  - Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio, no como techo — el proyecto puede ampliar la cobertura a otras capas sin restricción.
+  - Casos de borde obligatorios: el tope del 35% de descuento superado, carritos vacíos o con datos corruptos, cupones no registrados o expirados, e intentos de compra con stock insuficiente.
