@@ -5,7 +5,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/models/api-error.model';
 import { CartStateService } from '../../../checkout/data-access/cart-state.service';
 import { CartItem } from '../../../checkout/data-access/cart.model';
@@ -24,7 +24,9 @@ function createCartStateStub() {
   const discountBreakdown = signal<DiscountCalculationResult | null>(null);
   const discountLoading = signal(false);
   const discountError = signal<ApiError | null>(null);
-  const cartQuantities = computed(() => new Map(items().map((item) => [item.productId, item.quantity])));
+  const cartQuantities = computed(
+    () => new Map(items().map((item) => [item.productId, item.quantity])),
+  );
   const isCapped = computed(() => (discountBreakdown()?.appliedDiscounts ?? []).includes('TOTAL'));
   const hasItems = computed(() => items().length > 0);
 
@@ -40,7 +42,9 @@ function createCartStateStub() {
     cartQuantities,
     quantityOf: (productId: string) => cartQuantities().get(productId) ?? 0,
     setProducts: vi.fn(),
-    addItem: vi.fn((productId: string) => items.update((xs) => [...xs, { productId, quantity: 1 }])),
+    addItem: vi.fn((productId: string) =>
+      items.update((xs) => [...xs, { productId, quantity: 1 }]),
+    ),
     incrementItem: vi.fn(),
     decrementItem: vi.fn(),
     applyCoupon: vi.fn((code: string | null) => couponCode.set(code)),
@@ -51,7 +55,10 @@ function createCartStateStub() {
 
 type CartStateStub = ReturnType<typeof createCartStateStub>;
 
-function fakeActivatedRoute(data: Record<string, unknown>, queryParams: Record<string, string> = {}): ActivatedRoute {
+function fakeActivatedRoute(
+  data: Record<string, unknown>,
+  queryParams: Record<string, string> = {},
+): ActivatedRoute {
   return {
     snapshot: {
       data,
@@ -67,7 +74,14 @@ describe('ProductCatalogPage', () => {
   let cartState: CartStateStub;
 
   const products: Product[] = [
-    { id: 'p1', name: 'Producto 1', description: 'd', unitPrice: 50, category: 'TECNOLOGIA', stock: 3 },
+    {
+      id: 'p1',
+      name: 'Producto 1',
+      description: 'd',
+      unitPrice: 50,
+      category: 'TECNOLOGIA',
+      stock: 3,
+    },
     { id: 'p2', name: 'Producto 2', description: 'd', unitPrice: 20, category: 'OTRO', stock: 1 },
   ];
 
@@ -150,7 +164,9 @@ describe('ProductCatalogPage', () => {
     const fixture = setup({ products: null });
     getProducts.mockReturnValue(of(products));
 
-    const retryButton = fixture.nativeElement.querySelector('.product-catalog-page__error button') as HTMLButtonElement;
+    const retryButton = fixture.nativeElement.querySelector(
+      '.product-catalog-page__error button',
+    ) as HTMLButtonElement;
     retryButton.click();
     fixture.detectChanges();
 
@@ -163,7 +179,9 @@ describe('ProductCatalogPage', () => {
     const fixture = setup({ products: null });
     getProducts.mockReturnValue(throwError(() => new Error('network error')));
 
-    const retryButton = fixture.nativeElement.querySelector('.product-catalog-page__error button') as HTMLButtonElement;
+    const retryButton = fixture.nativeElement.querySelector(
+      '.product-catalog-page__error button',
+    ) as HTMLButtonElement;
     retryButton.click();
     fixture.detectChanges();
 
