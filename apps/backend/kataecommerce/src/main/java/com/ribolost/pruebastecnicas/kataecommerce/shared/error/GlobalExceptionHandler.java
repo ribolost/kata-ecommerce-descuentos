@@ -7,12 +7,24 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Centraliza la traducción de excepciones de negocio y de errores de
+ * validación (@ValidCouponCode, Bean Validation sobre CartRequest) a
+ * respuestas HTTP tipadas (application/problem+json), siguiendo el esquema
+ * Problem del contrato OpenAPI. Las excepciones no previstas se registran en
+ * el servidor y devuelven una respuesta genérica, sin exponer detalles internos.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientStockException.class)
     public ProblemDetail handleInsufficientStock(InsufficientStockException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ProblemDetail handleProductNotFound(ProductNotFoundException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler({EmptyCartException.class, InvalidCartItemException.class})
