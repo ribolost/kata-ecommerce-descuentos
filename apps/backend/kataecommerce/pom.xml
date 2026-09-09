@@ -88,6 +88,87 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<!--
+				JaCoCo: el proyecto no tenia configurada ninguna herramienta de
+				cobertura. Se agrega el plugin oficial de Maven (no altera
+				dependencias de produccion, solo el ciclo de build de test) con:
+				prepare-agent (instrumenta antes de "test"), report (genera el
+				reporte HTML/XML en target/site/jacoco tras "test") y check
+				(exige minimo 80% de lineas cubiertas en fase "verify").
+
+				El check se acota a las capas logicas esenciales
+				(arquitectura.md 2.5: motor de descuentos, validaciones de
+				stock), no al proyecto completo: las exclusiones de mas abajo
+				(configuracion a nivel de plugin, aplicada tambien a
+				prepare-agent y report) sacan del calculo infraestructura sin
+				logica de negocio propia: controladores REST, documentos y
+				repositorios de Mongo, mappers de mapeo uno a uno, adaptadores
+				de salida que delegan en servicios ya cubiertos por sus propias
+				suites, excepciones marcador, GlobalExceptionHandler, DTOs
+				anotados solo con Bean Validation, el seed de arranque y la
+				clase principal. Cada exclusion tiene una razon tecnica
+				objetiva (arquitectura.md, seccion 15): ninguna de esas clases
+				tiene una rama condicional o regla de negocio que proteger. El
+				dominio y la aplicacion (Discount, Order, Product/stock,
+				validadores) quedan dentro del calculo y deben llegar al 80%.
+			-->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.12</version>
+				<configuration>
+					<excludes>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/KataecommerceApplication.class</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/controller/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/adapter/in/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/adapter/out/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/repository/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/persistence/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/mapper/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/infrastructure/mappers/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/shared/seed/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/shared/error/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/application/exception/**</exclude>
+						<exclude>com/ribolost/pruebastecnicas/kataecommerce/**/application/dto/**</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<id>jacoco-prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.80</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
