@@ -1,8 +1,17 @@
 package com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.application.dto.in;
 
-/**
- * DTO de entrada para la Command CalculateDiscounts.
- * Atributos pendientes de definición (ver contrato OpenAPI: CartRequest).
- */
-public record DiscountCalculationRequest() {
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+
+import java.util.List;
+
+
+public record DiscountCalculationRequest(
+        @NotEmpty(message = "items no debe estar vacío")
+        @Valid
+        List<CartItem> items,
+        String couponCode
+) {
+    public record CartItem(String productId, int quantity) {
+    }
 }

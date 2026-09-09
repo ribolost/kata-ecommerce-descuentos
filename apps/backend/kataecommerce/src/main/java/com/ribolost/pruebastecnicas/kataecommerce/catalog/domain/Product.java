@@ -1,5 +1,7 @@
 package com.ribolost.pruebastecnicas.kataecommerce.catalog.domain;
 
+import com.ribolost.pruebastecnicas.kataecommerce.shared.error.InsufficientStockException;
+
 import java.math.BigDecimal;
 
 public class Product {
@@ -70,6 +72,18 @@ public class Product {
 
     public void setStock(int stock) {
         this.stock = stock;
+    }
+
+    public void decreaseStock(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("La cantidad a decrementar debe ser positiva");
+        }
+        if (this.stock < quantity) {
+            throw new InsufficientStockException(
+                    "Stock insuficiente para el producto " + id + ": disponible " + this.stock
+                            + ", solicitado " + quantity);
+        }
+        this.stock -= quantity;
     }
 
     public enum ProductCategory {
