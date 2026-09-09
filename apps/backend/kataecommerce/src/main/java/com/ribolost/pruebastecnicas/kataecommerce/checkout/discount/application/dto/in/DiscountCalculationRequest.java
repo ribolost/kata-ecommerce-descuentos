@@ -1,5 +1,6 @@
 package com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.application.dto.in;
 
+import com.ribolost.pruebastecnicas.kataecommerce.checkout.order.application.validation.ValidCouponCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -12,6 +13,8 @@ public record DiscountCalculationRequest(
         @NotEmpty(message = "items no debe estar vacío")
         @Valid
         List<CartItem> items,
+
+        @ValidCouponCode
         String couponCode
 ) {
     public record CartItem(

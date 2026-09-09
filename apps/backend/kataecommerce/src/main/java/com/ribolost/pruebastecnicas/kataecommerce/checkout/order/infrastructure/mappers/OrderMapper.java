@@ -6,12 +6,19 @@ import com.ribolost.pruebastecnicas.kataecommerce.checkout.order.domain.Order;
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.order.domain.OrderLine;
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.order.infrastructure.persistence.OrderDocument;
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.order.infrastructure.persistence.OrderLineDocument;
+import com.ribolost.pruebastecnicas.kataecommerce.shared.validation.ResponseValidator;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 public class OrderMapper {
+
+    private final ResponseValidator responseValidator;
+
+    public OrderMapper(ResponseValidator responseValidator) {
+        this.responseValidator = responseValidator;
+    }
 
     public OrderDocument toDocument(Order order) {
         List<OrderLineDocument> lines = order.getLines().stream()
@@ -62,7 +69,7 @@ public class OrderMapper {
                 ))
                 .toList();
 
-        return new OrderResponse(
+        OrderResponse response = new OrderResponse(
                 order.getId(),
                 order.getCreatedAt(),
                 items,
@@ -73,6 +80,7 @@ public class OrderMapper {
                 order.getAppliedDiscounts(),
                 order.getDiscountBreakdown()
         );
+        return responseValidator.validate(response);
     }
 
     private OrderLineDocument toDocument(OrderLine line) {

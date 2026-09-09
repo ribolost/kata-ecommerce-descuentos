@@ -16,6 +16,7 @@ import com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.domain.rules
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.infrastructure.repository.DiscountPolicyDocument;
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.infrastructure.repository.DiscountPolicyRepository;
 import com.ribolost.pruebastecnicas.kataecommerce.shared.error.InvalidCartItemException;
+import com.ribolost.pruebastecnicas.kataecommerce.shared.validation.ResponseValidator;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,14 +33,17 @@ public class DiscountService {
 
     private final DiscountPolicyRepository discountPolicyRepository;
     private final ProductService productService;
+    private final ResponseValidator responseValidator;
     private final DiscountChainFactory discountChainFactory = new DiscountChainFactory();
 
     private volatile DiscountPolicy cachedPolicy;
     private volatile DiscountRule cachedChain;
 
-    public DiscountService(DiscountPolicyRepository discountPolicyRepository, ProductService productService) {
+    public DiscountService(DiscountPolicyRepository discountPolicyRepository, ProductService productService,
+                            ResponseValidator responseValidator) {
         this.discountPolicyRepository = discountPolicyRepository;
         this.productService = productService;
+        this.responseValidator = responseValidator;
     }
 
     public DiscountCalculationResponse calculateDiscounts(DiscountCalculationRequest request) {
@@ -103,7 +107,7 @@ public class DiscountService {
 
         BigDecimal total = context.getSubtotal().subtract(context.getTotalDiscountAmount());
 
-        return new DiscountCalculationResponse(
+        DiscountCalculationResponse response = new DiscountCalculationResponse(
                 itemResponses,
                 context.getSubtotal(),
                 context.getTotalDiscountAmount(),
@@ -111,6 +115,7 @@ public class DiscountService {
                 List.copyOf(context.getAppliedDiscounts()),
                 breakdown
         );
+        return responseValidator.validate(response);
     }
 
     /**
@@ -175,13 +180,6 @@ public class DiscountService {
         return new DiscountPolicy(document.getId(), document.getRules());
     }
 
-    /**
-     * Marca como usado (RN-07) el Coupon de la DiscountPolicy cacheada cuyo
-     * código coincide con couponCode, y persiste el cambio. Al mutar el
-     * mismo objeto Coupon referenciado por la cadena cacheada, el efecto se
-     * ve reflejado de inmediato en cualquier petición posterior sin
-     * necesidad de recargar la política ni reconstruir la cadena.
-     */
     private synchronized void consumeAppliedCoupon(String couponCode) {
         if (cachedPolicy == null || couponCode == null || couponCode.isBlank()) {
             return;

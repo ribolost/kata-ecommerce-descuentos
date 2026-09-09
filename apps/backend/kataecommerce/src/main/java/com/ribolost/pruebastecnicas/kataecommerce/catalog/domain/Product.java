@@ -1,16 +1,31 @@
 package com.ribolost.pruebastecnicas.kataecommerce.catalog.domain;
 
 import com.ribolost.pruebastecnicas.kataecommerce.shared.error.InsufficientStockException;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 
 public class Product {
 
+    @NotBlank(message = "id es obligatorio")
     private String id;
+
+    @NotBlank(message = "name es obligatorio")
     private String name;
+
     private String description;
+
+    @NotNull(message = "unitPrice es obligatorio")
+    @Positive(message = "unitPrice debe ser mayor que 0")
     private BigDecimal unitPrice;
+
+    @NotNull(message = "category es obligatoria")
     private ProductCategory category;
+
+    @PositiveOrZero(message = "stock no puede ser negativo")
     private int stock;
 
     public Product() {
