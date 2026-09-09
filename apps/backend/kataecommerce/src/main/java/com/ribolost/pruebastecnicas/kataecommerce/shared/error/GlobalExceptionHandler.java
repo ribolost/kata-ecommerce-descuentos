@@ -69,8 +69,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ProblemDetail handleHandlerMethodValidation(HandlerMethodValidationException ex) {
-        String detail = ex.getAllValidationResults().stream()
-                .flatMap(result -> result.getResolvableErrors().stream())
+        java.util.stream.Stream<MessageSourceResolvable> paramErrorsStream = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream());
+        java.util.stream.Stream<MessageSourceResolvable> crossParamStream = ex.getCrossParameterValidationResults().stream();
+        String detail = java.util.stream.Stream.concat(paramErrorsStream, crossParamStream)
                 .map(MessageSourceResolvable::getDefaultMessage)
                 .filter(Objects::nonNull)
                 .reduce((a, b) -> a + "; " + b)
