@@ -82,7 +82,7 @@ Checkout -->|"uses"| Catalog
 | `DiscountRule`      | Eslabón que aplica un tipo específico de descuento sobre el resultado acumulado.                                                                      |
 | `Coupon`            | Código promocional de un solo uso: una vez aplicado en una compra confirmada, no puede volver a utilizarse.                                           |
 | `Subtotal`          | Suma de los precios de los productos del carrito, antes de aplicar cualquier descuento.                                                               |
-| `DiscountBreakdown` | Resultado del cálculo: montos por tipo de descuento, porcentaje efectivo, indicador de tope alcanzado y total a pagar.                                |
+| `DiscountBreakdown` | Resultado del cálculo: montos por tipo de descuento, porcentaje efectivo, descuento total y total a pagar.                                            |
 | `Total`             | Monto final a pagar, resultado de restar el descuento acumulado al subtotal.                                                                          |
 | `Order`             | Compra confirmada, con sus líneas, el desglose de descuentos aplicado y el stock ya decrementado.                                                     |
 
@@ -138,11 +138,15 @@ Checkout -->|"uses"| Catalog
 
 ### 1.9 Commands
 
-**Checkout**
+**Discount**
 
-- **CalculateCartDiscounts**: calcula el desglose de descuentos para el contenido actual del carrito, considerando opcionalmente un cupón, sin modificar el stock ni el estado de un cupón. Puede evaluarse en una simulación tantas veces como se quiera sin consumir el cupón.
+- **CalculateDiscounts**: calcula el desglose de descuentos para el contenido actual del carrito, considerando opcionalmente un cupón, sin modificar el stock ni el estado de un cupón. Puede evaluarse tantas veces como sea necesario sin consumir el cupón.
+
+**Order**
+
 - **PlaceOrder**: confirma la compra del contenido actual del carrito, considerando opcionalmente un cupón. Valida el stock, calcula los descuentos, decrementa el stock, marca el cupón aplicado como usado (si corresponde) y registra la orden. Es el único _Command_ que consume un cupón.
-  **Catalog**
+
+**Catalog**
 
 - **GetProducts**: consulta los productos disponibles con su stock, sin modificar estado.
 - **DecrementStock**: reduce el stock de un producto en la cantidad solicitada; rechaza la operación si no hay stock suficiente. Es invocado por `PlaceOrder` a través de `ProductCatalogPort`.
@@ -233,13 +237,13 @@ kata-ecommerce-descuentos/backend/
     │           └── ProductDocument.java
     │
     ├── checkout/
-    │   ├── discount/                              (subdominio Supporting — capas con nomenclatura de Hexagonal)
+    │   ├── discount/
     │   │   ├── domain/
     │   │   │   ├── DiscountPolicy.java
     │   │   │   ├── DiscountRuleDefinition.java
     │   │   │   ├── DiscountBreakdown.java
     │   │   │   ├── DiscountContext.java
-    │   │   │   ├── Coupon.java                    (entidad interna de DiscountPolicy)
+    │   │   │   ├── Coupon.java
     │   │   │   └── rules/
     │   │   │       ├── DiscountRule.java
     │   │   │       ├── CategoryDiscountRule.java
@@ -248,23 +252,28 @@ kata-ecommerce-descuentos/backend/
     │   │   │       ├── MaxDiscountCapRule.java
     │   │   │       └── DiscountChainFactory.java
     │   │   ├── application/
-    │   │   │   └── DiscountService.java
+    │   │   │   ├── DiscountService.java
+    │   │   │   └── dto/
+    │   │   │       ├── in/
+    │   │   │       │   └── DiscountCalculationRequest.java
+    │   │   │       └── out/
+    │   │   │           └── DiscountCalculationResponse.java
     │   │   └── infrastructure/
+    │   │       ├── controller/
+    │   │       │   └── DiscountController.java
     │   │       └── repository/
     │   │           ├── DiscountPolicyRepository.java
-    │   │           └── DiscountPolicyDocument.java  (Coupon embebido dentro del documento)
+    │   │           └── DiscountPolicyDocument.java
     │   │
-    │   └── order/                                 (subdominio Core — Hexagonal completa)
+    │   └── order/
     │       ├── domain/
     │       │   ├── Order.java
     │       │   └── OrderLine.java
     │       ├── application/
     │       │   ├── PlaceOrderService.java
-    │       │   ├── CalculateCartDiscountsService.java
     │       │   ├── port/
     │       │   │   ├── in/
-    │       │   │   │   ├── PlaceOrderUseCase.java
-    │       │   │   │   └── CalculateCartDiscountsUseCase.java
+    │       │   │   │   └── PlaceOrderUseCase.java
     │       │   │   └── out/
     │       │   │       ├── OrderRepository.java
     │       │   │       ├── ProductStockPort.java
@@ -275,8 +284,7 @@ kata-ecommerce-descuentos/backend/
     │       │   │   │   └── CartRequest.java
     │       │   │   └── out/
     │       │   │       ├── OrderLineResponse.java
-    │       │   │       ├── DiscountBreakdownResponse.java
-    │       │   │       └── OrderConfirmationResponse.java
+    │       │   │       └── OrderResponse.java
     │       │   └── validation/
     │       │       ├── ValidCouponCode.java
     │       │       └── CouponCodeFormatValidator.java
@@ -303,9 +311,9 @@ kata-ecommerce-descuentos/backend/
 
 **Módulo `catalog`.** Expone el listado de productos con su stock y permite que `checkout` consulte y decremente stock de forma controlada. No conoce nada sobre descuentos ni órdenes.
 
-**Módulo `discount`.** No consulta `catalog` por su cuenta: `DiscountService` ejecuta la cadena sobre los datos que `order` ya le resolvió. No tiene controlador propio — su caso de uso se expone a través de `CheckoutController`, en `order`.
+**Módulo `discount`.** Expone el cálculo de descuentos mediante `DiscountController` y `DiscountService`. El mismo servicio es consumido directamente por `order` durante la confirmación de la compra, reutilizando la misma lógica de cálculo para la consulta previa y para la creación de la orden.
 
-**Módulo `order`.** `OrderRepositoryAdapter` implementa `OrderRepository` contra MongoDB; `CatalogStockAdapter` implementa `ProductStockPort` invocando en proceso al `ProductService` de `catalog`, con una operación por lote (evita N+1, ver RN-10); `DiscountCalculationAdapter` implementa `DiscountCalculationPort` invocando al `DiscountService` de `discount`. `CheckoutController` expone `/cart/calculate` (`CalculateCartDiscountsUseCase`) y `/checkout` (`PlaceOrderUseCase`).
+**Módulo `order`.** `OrderRepositoryAdapter` implementa `OrderRepository` contra MongoDB; `CatalogStockAdapter` implementa `ProductStockPort` invocando en proceso al `ProductService` de `catalog`, con una operación por lote (evita N+1, ver RN-10). `PlaceOrderService` consume directamente `DiscountService` para calcular los descuentos. `CheckoutController` expone `/orders` (`PlaceOrderUseCase`).
 
 **Patrones de diseño del motor de descuentos.**
 
@@ -362,11 +370,379 @@ classDiagram
 | RN-03 | Descuento por cupón                                          | Se ingresó un código y corresponde a un `Coupon` activo y no usado                                                                                                            | 15% adicional sobre el total acumulado                                                                                                                                                                                                                                                                                                                                             | `WELCOME2026` válido sobre subtotal acumulado $150 → descuento de cupón = $22.50                                  | Regla base del motor de descuentos                                   |
 | RN-04 | Tope de descuento                                            | Siempre se evalúa, como último eslabón de la cadena                                                                                                                           | El descuento acumulado (RN-01 a RN-03) nunca supera 35% del subtotal original; si lo excede, se trunca exactamente en 35%                                                                                                                                                                                                                                                          | Subtotal $200; RN-01+RN-02+RN-03 calculan 40% ($80) → se trunca a 35% ($70); total a pagar $130                   | **Tope del 35% de descuento superado**                               |
 | RN-05 | Cupón inválido, inactivo o ya usado                          | El código no existe, está inactivo o `used = true`                                                                                                                            | RN-03 no se aplica; las demás reglas se calculan igual; la compra puede confirmarse                                                                                                                                                                                                                                                                                                | Código `EXPIRED2024` inexistente → checkout se confirma sin el 15%, con RN-01 y RN-02 aplicados                   | **Cupón no registrado o expirado**                                   |
-| RN-06 | Validación de stock                                          | Ocurre únicamente en `PlaceOrder` (`/checkout`); nunca en `CalculateCartDiscounts` (`/cart/calculate`)                                                                        | Si alguna línea no tiene stock suficiente, se rechaza toda la operación (`409`) antes de calcular o persistir cualquier dato                                                                                                                                                                                                                                                       | Carrito pide 2 unidades de un producto con stock 1 → `409` antes de cualquier cálculo                             | **Intento de compra con stock insuficiente**                         |
+| RN-06 | Validación de stock                                          | Ocurre únicamente en `PlaceOrder` (`POST /orders`); nunca en `CalculateDiscounts` (`POST /discounts`)                                                                         | Si alguna línea no tiene stock suficiente, se rechaza toda la operación (`409`) antes de calcular o persistir cualquier dato                                                                                                                                                                                                                                                       | Carrito pide 2 unidades de un producto con stock 1 → `409` antes de cualquier cálculo                             | **Intento de compra con stock insuficiente**                         |
 | RN-07 | Consumo de cupón                                             | Solo ocurre al confirmar la compra (`PlaceOrder`)                                                                                                                             | `Coupon.used` pasa a `true` de forma permanente, dentro de `DiscountPolicy`                                                                                                                                                                                                                                                                                                        | `WELCOME2026` aplicado en un `PlaceOrder` exitoso → un segundo intento con el mismo código se comporta como RN-05 | Regla base del motor de descuentos                                   |
-| RN-08 | Carrito vacío o inválido                                     | El carrito no tiene líneas, o una línea referencia un producto inexistente o cantidad ≤ 0                                                                                     | Se rechaza con `400` antes de cualquier cálculo, en ambas operaciones                                                                                                                                                                                                                                                                                                              | `items: []` → `400` tanto en `/cart/calculate` como en `/checkout`                                                | **Carrito vacío o con datos corruptos**                              |
-| RN-09 | Formato de cupón inválido                                    | El código no cumple el formato esperado (`@ValidCouponCode`, evaluado sobre `CartRequest`)                                                                                    | Se rechaza con `400` en el borde de la API, antes de llegar a cualquier caso de uso                                                                                                                                                                                                                                                                                                | Código `"ab"` → `400` sin llegar a `CalculateCartDiscountsService` ni `PlaceOrderService`                         | **Cupón no registrado o expirado** (variante de formato)             |
+| RN-08 | Carrito vacío o inválido                                     | El carrito no tiene líneas, o una línea referencia un producto inexistente o cantidad ≤ 0                                                                                     | Se rechaza con `400` antes de cualquier cálculo, en ambas operaciones                                                                                                                                                                                                                                                                                                              | `items: []` → `400` tanto en `/discounts` como en `/orders`                                                       | **Carrito vacío o con datos corruptos**                              |
+| RN-09 | Formato de cupón inválido                                    | El código no cumple el formato esperado (`@ValidCouponCode`, evaluado sobre `CartRequest`)                                                                                    | Se rechaza con `400` en el borde de la API, antes de llegar a cualquier caso de uso                                                                                                                                                                                                                                                                                                | Código `"ab"` → `400` sin llegar a `DiscountService` ni `PlaceOrderService`                                       | **Cupón no registrado o expirado** (variante de formato)             |
 | RN-10 | Consulta de stock por lote                                   | Validación de stock de las líneas de un carrito con más de un producto                                                                                                        | `ProductStockPort` recibe todas las líneas en una sola llamada; nunca una consulta por producto (evita N+1)                                                                                                                                                                                                                                                                        | Carrito con 5 líneas → 1 llamada a `ProductStockPort`, no 5                                                       | Requisito técnico que soporta RN-06                                  |
 | RN-11 | Orden de ejecución y consistencia dentro de una misma sesión | `PlaceOrder` ejecuta: validar stock → calcular descuentos → persistir la orden → decrementar stock, en ese orden, sin una transacción multi-documento que una las dos últimas | Si `decrementStock` falla (error de validación, timeout de Mongo, excepción no prevista) sin que el proceso se reinicie, la orden queda registrada con el stock sin descontar, y esa inconsistencia es visible mientras la aplicación siga corriendo. No aplica si el proceso se reinicia: al no haber persistencia real entre reinicios, ese escenario vuelve a los datos semilla | Ver ADR-18 para la limitación técnica de MongoDB y el camino de resolución futura                                 | Riesgo conocido, no cubierto por prueba automatizada en este alcance |
 
 **Manejo de errores.** `BusinessException` como raíz de las excepciones de negocio (`InsufficientStockException`, `EmptyCartException`, `InvalidCartItemException`), separadas de las excepciones técnicas. El tope de descuento del 35% no es una excepción (RN-04). `GlobalExceptionHandler` centraliza la traducción de excepciones de negocio y de errores de validación (`@ValidCouponCode`, Bean Validation sobre `CartRequest`) a respuestas HTTP tipadas; las excepciones no previstas se registran en el servidor y devuelven una respuesta genérica, sin exponer detalles internos.
+
+**Contratos REST.** El contrato expone recursos del catálogo, la consulta de descuentos y las órdenes.
+
+| Método | Endpoint                | Propósito                                                                    | Éxito | Errores relevantes                                      |
+| :----- | :---------------------- | :--------------------------------------------------------------------------- | :---- | :------------------------------------------------------ |
+| `GET`  | `/api/products`         | Listar productos disponibles                                                 | `200` | —                                                       |
+| `POST` | `/api/discounts`        | Calcular descuentos para el carrito sin modificar el estado de la aplicación | `200` | `400` solicitud inválida; `415` media type no soportado |
+| `POST` | `/api/orders`           | Crear una orden después de validar stock y calcular los descuentos           | `201` | `400` solicitud inválida; `409` stock insuficiente      |
+| `GET`  | `/api/orders/{orderId}` | Obtener una orden creada                                                     | `200` | `404` orden inexistente                                 |
+
+**Contrato de API (OpenAPI):**
+
+```yaml
+openapi: 3.1.1
+info:
+  title: Core E-Commerce Checkout API
+  version: 1.0.0
+servers:
+  - url: /api
+tags:
+  - name: Catalog
+  - name: Discounts
+  - name: Orders
+paths:
+  /products:
+    get:
+      tags: [Catalog]
+      operationId: listProducts
+      summary: List products
+      responses:
+        '200':
+          description: Products available in the catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+
+  /discounts:
+    post:
+      tags: [Discounts]
+      operationId: calculateDiscounts
+      summary: Calculate discounts for a cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartRequest'
+      responses:
+        '200':
+          description: Discount calculation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountCalculationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /orders:
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartRequest'
+      responses:
+        '201':
+          description: Order created
+          headers:
+            Location:
+              description: URI of the created order
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      operationId: getOrderById
+      summary: Get an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Insufficient stock for one or more products
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: Unsupported request media type
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    ProductResponse:
+      type: object
+      required:
+        [id, name, description, unitPrice, category, stock]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        unitPrice:
+          $ref: '#/components/schemas/Money'
+        category:
+          type: string
+          enum: [TECNOLOGIA, OTRO]
+        stock:
+          type: integer
+          minimum: 0
+
+    CartRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+        couponCode:
+          type: [string, 'null']
+          minLength: 1
+
+    CartItemRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+
+    DiscountCalculationResponse:
+      type: object
+      required:
+        - items
+        - subtotal
+        - totalDiscountAmount
+        - total
+        - appliedDiscounts
+        - discountBreakdown
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/DiscountItemResponse'
+        subtotal:
+          $ref: '#/components/schemas/Money'
+        totalDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        appliedDiscounts:
+          $ref: '#/components/schemas/AppliedDiscounts'
+        discountBreakdown:
+          $ref: '#/components/schemas/DiscountBreakdown'
+
+    DiscountItemResponse:
+      type: object
+      required:
+        [productId, quantity, subtotal, discount, total]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        subtotal:
+          $ref: '#/components/schemas/Money'
+        discount:
+          $ref: '#/components/schemas/Money'
+          description: Total discount allocated to the item after all applicable rules and the maximum discount cap.
+        total:
+          $ref: '#/components/schemas/Money'
+
+    OrderResponse:
+      type: object
+      required:
+        - id
+        - createdAt
+        - items
+        - subtotal
+        - totalDiscountAmount
+        - total
+        - appliedDiscounts
+        - discountBreakdown
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
+        subtotal:
+          $ref: '#/components/schemas/Money'
+        totalDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        couponCode:
+          type: [string, 'null']
+        appliedDiscounts:
+          $ref: '#/components/schemas/AppliedDiscounts'
+        discountBreakdown:
+          $ref: '#/components/schemas/DiscountBreakdown'
+
+    OrderItemResponse:
+      type: object
+      required:
+        [
+          productId,
+          name,
+          unitPrice,
+          quantity,
+          subtotal,
+          discount,
+          total,
+        ]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        unitPrice:
+          $ref: '#/components/schemas/Money'
+        quantity:
+          type: integer
+          minimum: 1
+        subtotal:
+          $ref: '#/components/schemas/Money'
+        discount:
+          $ref: '#/components/schemas/Money'
+          description: Total discount allocated to the item after all applicable rules and the maximum discount cap. The sum of item discounts equals totalDiscountAmount.
+        total:
+          $ref: '#/components/schemas/Money'
+
+    DiscountBreakdown:
+      type: object
+      required:
+        - categoryDiscountAmount
+        - volumeDiscountAmount
+        - couponDiscountAmount
+        - totalDiscountAmount
+        - effectiveDiscountPercentage
+      properties:
+        categoryDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        volumeDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        couponDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        totalDiscountAmount:
+          $ref: '#/components/schemas/Money'
+        effectiveDiscountPercentage:
+          type: number
+          minimum: 0
+          maximum: 0.35
+          multipleOf: 0.0001
+          description: Effective discount represented as a ratio. For example, 0.35 represents 35%.
+
+    AppliedDiscounts:
+      type: array
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/DiscountType'
+
+    DiscountType:
+      type: string
+      enum: [CATEGORY, VOLUME, COUPON, TOTAL]
+      description: TOTAL indicates that the maximum discount cap was reached and applied.
+
+    Money:
+      type: number
+      minimum: 0
+      multipleOf: 0.01
+      description: Monetary amount expressed in USD, with a precision of two decimal places.
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: URI reference identifying the problem type.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          description: HTTP status code generated for this problem occurrence.
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence.
+        instance:
+          type: string
+          format: uri-reference
+          description: URI reference identifying the specific problem occurrence.
+        code:
+          type: string
+          description: Application-specific machine-readable error code.
+```
