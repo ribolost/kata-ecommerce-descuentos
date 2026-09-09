@@ -165,9 +165,9 @@ Dos Bounded Contexts: `checkout`, dividido internamente en el paquete `order` (s
 
 ### 2.3 Frontend
 
-La aplicación Angular se organiza por Bounded Context: cada _Page_ de _Atomic Design_ corresponde a uno de los Bounded Contexts del dominio (`catalog`, `checkout`), sin acoplamiento cruzado más allá de interfaces bien definidas — el catálogo no necesita saber nada del carrito, y viceversa.
+La aplicación Angular se organiza por Bounded Context: cada _Page_ de _Atomic Design_ corresponde a uno de los Bounded Contexts del dominio (`catalog`, `checkout`), sin acoplamiento cruzado más allá de interfaces bien definidas. Además, contiene un sidebar en donde se encuentra el carrito de compras.
 
-El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el servidor para reducir el tiempo hasta la primera pintura, y la interacción del carrito se hidrata en el cliente una vez cargada la página. El detalle completo está en "Arquitectura interna".
+El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el servidor para reducir el tiempo hasta la primera pintura, y la interacción del carrito se hidrata en el cliente una vez cargada la página. El detalle completo está en [Arquitectura interna](#32-frontend).
 
 ### 2.4 Selección de tecnologías
 
@@ -182,7 +182,7 @@ El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el 
   - Contratos de entrada tipados mediante DTOs y validados de forma declarativa (Bean Validation en backend, formularios tipados en frontend), de modo que un dato inválido o mal formado se rechace antes de llegar a la lógica de dominio.
   - Un agente de _IA_ ejecuta las herramientas de análisis **SAST** (Static Application Security Testing), **SCA** (Software Composition Analysis) y _Secret Scanning_ antes de integrar cambios, sin vulnerabilidades críticas ni secretos expuestos sin remediar.
 - **Testabilidad**, tanto en backend como en frontend.
-  - Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio, no como techo — el proyecto puede ampliar la cobertura a otras capas sin restricción.
+  - Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio (no representa el máximo) — el proyecto puede ampliar la cobertura a otras capas sin restricción.
   - Casos de borde obligatorios: el tope del 35% de descuento superado, carritos vacíos o con datos corruptos, cupones no registrados o expirados, e intentos de compra con stock insuficiente.
 
 ### 2.6 Modelo C4
@@ -379,14 +379,19 @@ classDiagram
 
 **Manejo de errores.** `BusinessException` como raíz de las excepciones de negocio (`InsufficientStockException`, `EmptyCartException`, `InvalidCartItemException`), separadas de las excepciones técnicas. El tope de descuento del 35% no es una excepción (RN-04). `GlobalExceptionHandler` centraliza la traducción de excepciones de negocio y de errores de validación (`@ValidCouponCode`, Bean Validation sobre `CartRequest`) a respuestas HTTP tipadas; las excepciones no previstas se registran en el servidor y devuelven una respuesta genérica, sin exponer detalles internos.
 
-**Contratos REST.** El contrato expone recursos del catálogo, la consulta de descuentos y las órdenes.
+**Contratos REST.** El contrato expone las capacidades de catálogo, descuentos y órdenes.
 
-| Método | Endpoint                | Propósito                                                                    | Éxito | Errores relevantes                                      |
-| :----- | :---------------------- | :--------------------------------------------------------------------------- | :---- | :------------------------------------------------------ |
-| `GET`  | `/api/products`         | Listar productos disponibles                                                 | `200` | —                                                       |
-| `POST` | `/api/discounts`        | Calcular descuentos para el carrito sin modificar el estado de la aplicación | `200` | `400` solicitud inválida; `415` media type no soportado |
-| `POST` | `/api/orders`           | Crear una orden después de validar stock y calcular los descuentos           | `201` | `400` solicitud inválida; `409` stock insuficiente      |
-| `GET`  | `/api/orders/{orderId}` | Obtener una orden creada                                                     | `200` | `404` orden inexistente                                 |
+| Método | Endpoint                                        | Propósito                                                                                                | Éxito | Errores relevantes                                                 |
+| :----- | :---------------------------------------------- | :------------------------------------------------------------------------------------------------------- | :---- | :----------------------------------------------------------------- |
+| `GET`  | `/api/products`                                 | Obtener los productos disponibles con su stock actual                                                    | `200` | —                                                                  |
+| `GET`  | `/api/products/{productId}`                     | Obtener un producto específico con su stock actual                                                       | `200` | `404` producto inexistente                                         |
+| `GET`  | `/api/stocks/{productId}`                       | Obtener el stock actual de un producto                                                                   | `200` | `404` producto inexistente                                         |
+| `GET`  | `/api/stocks?productIds={id1}&productIds={id2}` | Obtener el stock actual de varios productos                                                              | `200` | `400` parámetros inválidos; `404` uno o más productos inexistentes |
+| `POST` | `/api/discounts`                                | Calcular los descuentos del carrito sin modificar el estado de la aplicación                             | `200` | `400` solicitud inválida; `415` media type no soportado            |
+| `POST` | `/api/orders`                                   | Crear una orden, validando stock, calculando descuentos, decrementando el stock y persistiendo la compra | `201` | `400` solicitud inválida; `409` stock insuficiente                 |
+| `GET`  | `/api/orders/{orderId}`                         | Obtener una orden creada                                                                                 | `200` | `404` orden inexistente                                            |
+
+El decremento del stock se ejecuta como parte de `POST /api/orders` después de la validación correspondiente. No se expone como endpoint independiente porque permitiría modificar la disponibilidad sin una operación de compra asociada.
 
 **Contrato de API (OpenAPI):**
 
@@ -399,6 +404,7 @@ servers:
   - url: /api
 tags:
   - name: Catalog
+
   - name: Discounts
   - name: Orders
 paths:
@@ -417,6 +423,71 @@ paths:
                 items:
                   $ref: '#/components/schemas/ProductResponse'
 
+  /products/{productId}:
+    get:
+      tags: [Catalog]
+      operationId: getProductById
+      summary: Get a product
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /stocks/{productId}:
+    get:
+      tags: [Catalog]
+      operationId: getProductStock
+      summary: Get product stock
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Current stock for the product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /stocks:
+    get:
+      tags: [Catalog]
+      operationId: getProductsStock
+      summary: Get stock for multiple products
+      parameters:
+        - name: productIds
+          in: query
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              format: uuid
+      responses:
+        '200':
+          description: Current stock for the requested products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /discounts:
     post:
       tags: [Discounts]
@@ -427,7 +498,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CartRequest'
+              $ref: '#/components/schemas/DiscountCalculationRequest'
       responses:
         '200':
           description: Discount calculation result
@@ -492,6 +563,15 @@ paths:
           $ref: '#/components/responses/NotFound'
 
 components:
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
   responses:
     BadRequest:
       description: Invalid request
@@ -540,6 +620,30 @@ components:
         stock:
           type: integer
           minimum: 0
+
+    StockResponse:
+      type: object
+      required: [productId, stock]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        stock:
+          type: integer
+          minimum: 0
+
+    DiscountCalculationRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+        couponCode:
+          type: [string, 'null']
+          minLength: 1
 
     CartRequest:
       type: object
