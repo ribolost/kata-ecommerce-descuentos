@@ -15,6 +15,7 @@ import com.ribolost.pruebastecnicas.kataecommerce.shared.error.InsufficientStock
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,9 @@ public class PlaceOrderService implements PlaceOrderUseCase, GetOrderUseCase {
             throw new OrderStockException(ex.getMessage(), ex);
         }
 
-        DiscountCalculationResponse discountResponse = discountCalculationPort.calculate(cartRequest);
+        // consumeCoupon = true: a diferencia de POST /api/discounts, PlaceOrder
+        // es el único flujo que debe marcar el cupón aplicado como usado (RN-07).
+        DiscountCalculationResponse discountResponse = discountCalculationPort.calculate(cartRequest, true);
 
         Map<String, String> productNamesById = productStockPort.getProductNames(
                 cartRequest.items().stream()
@@ -56,7 +59,7 @@ public class PlaceOrderService implements PlaceOrderUseCase, GetOrderUseCase {
                 .map(item -> new OrderLine(
                         item.productId(),
                         productNamesById.get(item.productId()),
-                        item.subtotal().divide(BigDecimal.valueOf(item.quantity())),
+                        item.subtotal().divide(BigDecimal.valueOf(item.quantity()), 2, RoundingMode.HALF_UP),
                         item.quantity(),
                         item.subtotal(),
                         item.discount(),
@@ -76,6 +79,11 @@ public class PlaceOrderService implements PlaceOrderUseCase, GetOrderUseCase {
                 discountResponse.discountBreakdown()
         );
 
+        // Persistir antes de decrementar stock (RN-11): si decrementStock falla,
+        // la orden queda registrada y la inconsistencia queda documentada/visible,
+        // en lugar de perder el registro de una compra ya calculada.
+        Order savedOrder = orderRepository.save(order);
+
         try {
             productStockPort.decrementStock(cartRequest);
         } catch (InsufficientStockException ex) {
@@ -85,7 +93,7 @@ public class PlaceOrderService implements PlaceOrderUseCase, GetOrderUseCase {
             );
         }
 
-        return orderRepository.save(order);
+        return savedOrder;
     }
 
     @Override

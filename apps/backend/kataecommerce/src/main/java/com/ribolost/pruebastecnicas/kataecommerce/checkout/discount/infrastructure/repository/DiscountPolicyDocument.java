@@ -1,6 +1,5 @@
 package com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.infrastructure.repository;
 
-import com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.domain.Coupon;
 import com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.domain.DiscountRuleDefinition;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -19,16 +18,12 @@ public class DiscountPolicyDocument {
     @Field("rules")
     private List<DiscountRuleDefinition> rules = new ArrayList<>();
 
-    @Field("coupons")
-    private List<Coupon> coupons = new ArrayList<>();
-
     public DiscountPolicyDocument() {
     }
 
-    public DiscountPolicyDocument(String id, List<DiscountRuleDefinition> rules, List<Coupon> coupons) {
+    public DiscountPolicyDocument(String id, List<DiscountRuleDefinition> rules) {
         this.id = id;
         this.rules = rules;
-        this.coupons = coupons;
     }
 
     public String getId() {
@@ -45,13 +40,5 @@ public class DiscountPolicyDocument {
 
     public void setRules(List<DiscountRuleDefinition> rules) {
         this.rules = rules;
-    }
-
-    public List<Coupon> getCoupons() {
-        return coupons;
-    }
-
-    public void setCoupons(List<Coupon> coupons) {
-        this.coupons = coupons;
     }
 }
