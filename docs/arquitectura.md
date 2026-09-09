@@ -185,3 +185,33 @@ El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el 
 - **Testabilidad**, tanto en backend como en frontend.
   - Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio, no como techo — el proyecto puede ampliar la cobertura a otras capas sin restricción.
   - Casos de borde obligatorios: el tope del 35% de descuento superado, carritos vacíos o con datos corruptos, cupones no registrados o expirados, e intentos de compra con stock insuficiente.
+
+### 2.6 Modelo C4
+
+**Contexto del sistema** — actores y sistema, sin sistemas externos dentro del alcance funcional actual.
+
+```mermaid
+C4Context
+    title Contexto del Sistema - Core E-Commerce Checkout
+    Person(customer, "Cliente", "Arma un carrito y confirma la compra")
+    System(ecommerce, "Core E-Commerce Checkout", "Gestiona el carrito y calcula/persiste el checkout con descuentos acumulativos")
+    Rel(customer, ecommerce, "Agrega productos, aplica cupón, confirma compra")
+```
+
+**Contenedores** — frontend, backend y base de datos como las tres unidades desplegables del sistema; Mongo corre en su propio contenedor Docker, levantado como instancia de pruebas mediante el soporte de Docker Compose de Spring Boot.
+
+```mermaid
+C4Container
+    title Contenedores - Core E-Commerce Checkout
+    Person(customer, "Cliente")
+    System_Boundary(sb, "Core E-Commerce Checkout") {
+        Container(spa, "Frontend", "Angular 22", "Carrito reactivo, desglose de descuentos y alerta de tope")
+        Container(api, "Backend API", "Java 21 / Spring Boot 4.1", "Expone REST, ejecuta el motor de descuentos, valida stock y persiste órdenes")
+        ContainerDb(db, "Persistencia", "MongoDB (contenedor Docker)", "Productos, política de descuentos y órdenes")
+    }
+    Rel(customer, spa, "Usa", "HTTPS")
+    Rel(spa, api, "Consume", "REST/JSON")
+    Rel(api, db, "Lee y escribe", "Spring Data MongoDB")
+```
+
+---
