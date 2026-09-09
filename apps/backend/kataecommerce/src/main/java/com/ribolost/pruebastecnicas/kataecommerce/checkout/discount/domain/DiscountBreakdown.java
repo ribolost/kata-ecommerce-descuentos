@@ -1,5 +1,10 @@
 package com.ribolost.pruebastecnicas.kataecommerce.checkout.discount.domain;
 
-public class DiscountBreakdown {
+import java.math.BigDecimal;
+
+
+public record DiscountBreakdown(BigDecimal categoryDiscountAmount, BigDecimal volumeDiscountAmount,
+                                BigDecimal couponDiscountAmount, BigDecimal totalDiscountAmount,
+                                BigDecimal effectiveDiscountPercentage) {
 
 }
