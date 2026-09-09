@@ -87,7 +87,39 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "coverage": true,
+            "coverageReporters": ["text", "html", "lcov"],
+            "coverageExclude": [
+              "src/main.ts",
+              "src/main.server.ts",
+              "src/server.ts",
+              "src/app/app.ts",
+              "src/app/app.config.ts",
+              "src/app/app.config.server.ts",
+              "src/app/app.routes.ts",
+              "src/app/app.routes.server.ts",
+              "src/app/core/config/**",
+              "src/app/**/*.model.ts",
+              "src/app/features/catalog/data-access/product.mock.ts",
+              "src/app/shared/ui/atoms/button/**",
+              "src/app/shared/ui/atoms/icon-button/**",
+              "src/app/shared/ui/atoms/loading-indicator/**",
+              "src/app/shared/ui/atoms/price-tag/**",
+              "src/app/shared/ui/atoms/quantity-value/**",
+              "src/app/shared/ui/atoms/text-input/**",
+              "src/app/shared/ui/molecules/cart-item-row/**",
+              "src/app/shared/ui/molecules/discount-line-item/**",
+              "src/app/shared/ui/templates/**"
+            ],
+            "coverageThresholds": {
+              "statements": 80,
+              "branches": 80,
+              "functions": 80,
+              "lines": 80
+            }
+          }
         }
       }
     }
