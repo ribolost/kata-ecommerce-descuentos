@@ -17,11 +17,11 @@ durante el diseño e implementación de la solución "Core E-Commerce con Sistem
 
 ## IAs utilizadas
 
-| IA      | Proveedor | Uso principal en el proyecto |
-| ------- | --------- | ---------------------------- |
-| Claude  | Anthropic |                              |
-| Gemini  | Google    |                              |
-| ChatGPT | OpenAI    |                              |
+| IA      | Proveedor | Uso principal en el proyecto                                               |
+| ------- | --------- | -------------------------------------------------------------------------- |
+| Claude  | Anthropic | Programación y diseño en conjunto con el desarrollador; manejo de agentes. |
+| Gemini  | Google    | Consultas puntuales, ejemplos de código y búsqueda de documentación.       |
+| ChatGPT | OpenAI    | Redacción y organización de documentos, y consulta de dudas.               |
 
 ---
 
@@ -132,10 +132,10 @@ relacionados con IA y los de desarrollo manual, aunque no es obligatoria dentro 
 _Prompts_ utilizados en el diseño e implementación del proyecto. La categoría corresponde a los flujos de trabajo
 definidos en el contrato de uso (diseño, implementación, pruebas, transversal o auditoría).
 
-| Categoría | _Prompt_ | Descripción |
-| --------- | -------- | ----------- |
-|           |          |             |
-|           |          |             |
+| Categoría      | _Prompt_                                                                               | Descripción                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implementación | Refinamiento del módulo `order` (validación de stock, mappers, caso de uso `GetOrder`) | Se pidió modificar los archivos existentes de `order` para: lanzar excepción de negocio cuando falla el decremento de stock (manejada luego por el `GlobalExceptionHandler`), extraer la lógica de mapeo a `infrastructure/mappers`, y crear `GetOrder` como caso de uso nuevo implementado por `PlaceOrderService`, propagando una excepción de negocio si la orden no existe. |
+| Diseño         | Generación de estructura de carpetas del backend a partir de la arquitectura           | Se pidió generar, a partir de la sección "Arquitectura interna" del documento de arquitectura, el árbol de carpetas y archivos `.java` vacíos del backend (`catalog`, `checkout/discount`, `checkout/order`, `shared/error`), excluyendo la ruta `src/main/java/...`.                                                                                                           |
 
 ---
 
@@ -188,6 +188,50 @@ diario del desarrollador.
   ```bash
   git diff --stat <scaffold-commit-hash> HEAD -- <ruta-del-archivo>
   ```
+
+### Comparativa de aporte por rama
+
+Script para ejecutar sobre una rama específica (`<rama>`), que compara commits y líneas de código entre IA y
+desarrollador, y calcula el porcentaje de cada uno respetando los trailers `AI-Assisted: true` / `AI-Stage` definidos
+en la metodología:
+
+```bash
+RAMA=<rama>
+
+# --- Commits ---
+TOTAL_COMMITS=$(git log "$RAMA" --oneline | wc -l)
+COMMITS_IA=$(git log "$RAMA" --grep="AI-Assisted: true" --oneline | wc -l)
+COMMITS_MANUALES=$(git log "$RAMA" --grep="AI-Assisted: true" --invert-grep --oneline | wc -l)
+
+# --- Líneas modificadas (agregadas + eliminadas) ---
+LINEAS_IA=$(git log "$RAMA" --grep="AI-Assisted: true" --pretty=tformat: --numstat \
+  | awk '{ add+=$1; del+=$2 } END { print add+del+0 }')
+LINEAS_TOTAL=$(git log "$RAMA" --pretty=tformat: --numstat \
+  | awk '{ add+=$1; del+=$2 } END { print add+del+0 }')
+LINEAS_MANUALES=$((LINEAS_TOTAL - LINEAS_IA))
+
+echo "Rama: $RAMA"
+echo "----------------------------------------"
+echo "Commits totales:        $TOTAL_COMMITS"
+echo "Commits con IA:         $COMMITS_IA"
+echo "Commits manuales:       $COMMITS_MANUALES"
+echo "----------------------------------------"
+echo "Líneas totales:         $LINEAS_TOTAL"
+echo "Líneas con IA:          $LINEAS_IA"
+echo "Líneas manuales:        $LINEAS_MANUALES"
+echo "----------------------------------------"
+awk -v ci="$COMMITS_IA" -v ct="$TOTAL_COMMITS" -v li="$LINEAS_IA" -v lt="$LINEAS_TOTAL" 'BEGIN {
+  if (ct > 0) printf "%% commits con IA:  %.2f%%\n", (ci/ct)*100
+  if (lt > 0) printf "%% líneas con IA:   %.2f%%\n", (li/lt)*100
+}'
+```
+
+- `AI-Assisted: true` agrupa tanto commits `[ai-scaffold]` como refinamientos asistidos por IA, tal como se define en
+  la metodología; por eso el porcentaje de commits/líneas "con IA" incluye ambos casos.
+- El porcentaje por **líneas** es más representativo que el de commits, ya que un commit de refinamiento pequeño no
+  pesa igual que un scaffold que generó cientos de líneas.
+- Para comparar el aporte de IA únicamente contra el refinamiento manual posterior (sin contar el scaffold inicial),
+  se puede acotar el rango con `git log <scaffold-commit-hash>..HEAD` en lugar de `$RAMA` completo.
 
 ### Resumen final
 
