@@ -1,13 +1,40 @@
 # Arquitectura: Core E-Commerce Checkout con Descuentos Acumulativos
 
-> **Objetivo:** gestionar un carrito de compras y procesar el checkout aplicando un motor de descuentos acumulativos con
-> reglas de precedencia y un tope máximo, garantizando consistencia entre el cálculo, el stock y la orden persistida.
+> **Objetivo:** gestionar un carrito de compras y procesar el checkout aplicando un motor de descuentos acumulativos con reglas de precedencia y un tope máximo, garantizando consistencia entre el cálculo, el stock y la orden persistida.
+
+## Índice
+
+- **1. [Dominio (DDD)](#1-dominio-ddd)**
+  - 1.1 [Subdominios](#11-subdominios)
+  - 1.2 [Bounded Contexts](#12-bounded-contexts)
+  - 1.3 [Context Map](#13-context-map)
+  - 1.4 [Lenguaje ubicuo](#14-lenguaje-ubicuo)
+  - 1.5 [Entidades](#15-entidades)
+  - 1.6 [Aggregates](#16-aggregates)
+  - 1.7 [Value Objects](#17-value-objects)
+  - 1.8 [Invariantes](#18-invariantes)
+  - 1.9 [Commands](#19-commands)
+- **2. [Arquitectura externa](#2-arquitectura-externa)**
+  - 2.1 [Visión general](#21-visión-general)
+  - 2.2 [Backend](#22-backend)
+  - 2.3 [Frontend](#23-frontend)
+  - 2.4 [Selección de tecnologías](#24-selección-de-tecnologías)
+  - 2.5 [Requerimientos no funcionales](#25-requerimientos-no-funcionales)
+  - 2.6 [Modelo C4](#26-modelo-c4)
+  - 2.7 [Trabajos futuros](#27-trabajos-futuros)
+- **3. [Trade-offs y decisiones arquitectónicas](#3-trade-offs-y-decisiones-arquitectónicas)**
+  - 3.1 [Trade-offs](#31-trade-offs)
+  - 3.2 [Registro de decisiones (ADR)](#32-registro-de-decisiones-adr)
+- **4. [Arquitectura interna](#4-arquitectura-interna)**
+  - 4.1 [Backend](#41-backend)
+  - 4.2 [Frontend](#42-frontend)
+  - 4.3 [Persistencia](#43-persistencia)
 
 ---
 
-### Dominio (DDD)
+### 1. Dominio (DDD)
 
-#### Subdominios
+#### 1.1 Subdominios
 
 | Subdominio                         | Clasificación | Descripción                                                                                |
 | :--------------------------------- | :------------ | :----------------------------------------------------------------------------------------- |
@@ -19,14 +46,14 @@ El Proceso de Checkout es el subdominio _Core_: completar una compra de forma co
 
 El sistema opera en modalidad monousuario: no existe gestión de usuarios, sesiones ni autenticación. El estado del carrito y el uso de cupones son globales a la aplicación, no están asociados a un cliente identificado — por eso ningún _Aggregate_ del modelo necesita una referencia a un usuario o una sesión.
 
-#### Bounded Contexts
+#### 1.2 Bounded Contexts
 
 Se identifican dos _Bounded Contexts_:
 
 - **Checkout**: agrupa los subdominios Proceso de Checkout (_Core_) y Motor de Descuentos (_Supporting_). Ambos comparten el mismo lenguaje (`Cart`, `Order`, `DiscountBreakdown`), el mismo ciclo de despliegue y no existe necesidad de un límite de contexto real entre ellos. Internamente se organizan como paquetes independientes (`order` y `discount`), de modo que la distinción _Core_/_Supporting_ quede reflejada en el código sin fragmentar el modelo en dos _Bounded Contexts_ separados.
 - **Catalog**: lenguaje y reglas propias (`Product`, `Stock`, `Category`) independientes de las de Checkout.
 
-#### Context Map
+#### 1.3 Context Map
 
 `Catalog` es el **_Upstream / Supplier_** porque es el Bounded Context responsable del catálogo de productos y del stock disponible. `Checkout` es el **_Downstream / Customer_** porque utiliza esas capacidades durante el proceso de compra para obtener la información necesaria y gestionar la disponibilidad de los productos.
 
@@ -41,7 +68,7 @@ Checkout -->|"uses"| Catalog
 
 ```
 
-#### Lenguaje ubicuo
+#### 1.4 Lenguaje ubicuo
 
 | Término             | Significado                                                                                                                                           |
 | :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -56,7 +83,7 @@ Checkout -->|"uses"| Catalog
 | `Total`             | Monto final a pagar, resultado de restar el descuento acumulado al subtotal.                                                                          |
 | `Order`             | Compra confirmada, con sus líneas, el desglose de descuentos aplicado y el stock ya decrementado.                                                     |
 
-#### Entidades
+#### 1.5 Entidades
 
 | Entidad                  | Tipo             | Pertenece a      | Descripción                                                                      |
 | :----------------------- | :--------------- | :--------------- | :------------------------------------------------------------------------------- |
@@ -71,7 +98,7 @@ Checkout -->|"uses"| Catalog
 
 - `Cart` es una estructura de paso, vigente solo durante el cálculo que la usa; no se persiste como documento independiente.
 
-#### Aggregates
+#### 1.6 Aggregates
 
 | Aggregate          | Subdominio                         | Aggregate Root   | Responsabilidad                                                                                  | Invariantes                                                                                                                                                                                                                  |
 | :----------------- | :--------------------------------- | :--------------- | :----------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,7 +111,7 @@ Checkout -->|"uses"| Catalog
 
 - La regla de tipo `COUPON` dentro de `DiscountPolicy` define únicamente su posición en la precedencia (el descuento por cupón se evalúa en tercer lugar). El código promocional, su porcentaje y su estado de uso son responsabilidad del _Aggregate_ `Coupon`. Esta separación responde a que el orden de precedencia lo define el negocio una vez, mientras que el estado de un cupón cambia con cada compra que lo utiliza.
 
-#### Value Objects
+#### 1.7 Value Objects
 
 | Value Object        | Descripción                                                                                                                                                                                                                                                                          |
 | :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -93,7 +120,7 @@ Checkout -->|"uses"| Catalog
 | `CouponCode`        | Representa el código de un cupón (por ejemplo, `WELCOME2026`). Normaliza el valor ingresado (sin distinguir mayúsculas/minúsculas ni espacios) y valida su formato. Es el identificador de negocio del _Aggregate_ `Coupon`; no tiene estado propio ni conoce si el cupón fue usado. |
 | `DiscountBreakdown` | Resultado inmutable del cálculo de descuentos: los montos por tipo de descuento y el total resultante. Una vez calculado, no se modifica.                                                                                                                                            |
 
-#### Invariantes
+#### 1.8 Invariantes
 
 | Invariante                                         | Dónde se garantiza                                                                                              |
 | :------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
@@ -103,7 +130,7 @@ Checkout -->|"uses"| Catalog
 | Orden y unicidad de `DiscountRuleDefinition.order` | `DiscountPolicy` (_Aggregate Root_): no permite agregar una regla que repita un `order` ya existente.           |
 | Un `Coupon` usado no puede volver a aplicarse      | `Coupon` (_Aggregate Root_): una vez marcado como usado, ninguna operación posterior puede revertir ese estado. |
 
-#### Commands
+#### 1.9 Commands
 
 **Checkout**
 
