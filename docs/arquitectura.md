@@ -306,3 +306,67 @@ kata-ecommerce-descuentos/backend/
 **Módulo `discount`.** No consulta `catalog` por su cuenta: `DiscountService` ejecuta la cadena sobre los datos que `order` ya le resolvió. No tiene controlador propio — su caso de uso se expone a través de `CheckoutController`, en `order`.
 
 **Módulo `order`.** `OrderRepositoryAdapter` implementa `OrderRepository` contra MongoDB; `CatalogStockAdapter` implementa `ProductStockPort` invocando en proceso al `ProductService` de `catalog`, con una operación por lote (evita N+1, ver RN-10); `DiscountCalculationAdapter` implementa `DiscountCalculationPort` invocando al `DiscountService` de `discount`. `CheckoutController` expone `/cart/calculate` (`CalculateCartDiscountsUseCase`) y `/checkout` (`PlaceOrderUseCase`).
+
+**Patrones de diseño del motor de descuentos.**
+
+Cadena de reglas de descuento (Chain of Responsibility):
+
+```mermaid
+classDiagram
+    class DiscountRule {
+        <<interface>>
+        +apply(DiscountContext) DiscountContext
+    }
+    class CategoryDiscountRule
+    class VolumeDiscountRule
+    class CouponDiscountRule
+    class MaxDiscountCapRule
+
+    DiscountRule <|.. CategoryDiscountRule
+    DiscountRule <|.. VolumeDiscountRule
+    DiscountRule <|.. CouponDiscountRule
+    DiscountRule <|.. MaxDiscountCapRule
+
+    CategoryDiscountRule --> DiscountRule : next
+    VolumeDiscountRule --> DiscountRule : next
+    CouponDiscountRule --> DiscountRule : next
+```
+
+Construcción de la cadena a partir de la configuración (Factory):
+
+```mermaid
+classDiagram
+    class DiscountChainFactory {
+        +buildChain(DiscountPolicy) DiscountRule
+    }
+    class DiscountPolicy {
+        +List~DiscountRuleDefinition~ rules
+    }
+    class DiscountRuleDefinition {
+        +int order
+        +DiscountType type
+        +BigDecimal value
+    }
+
+    DiscountChainFactory ..> DiscountPolicy : lee
+    DiscountChainFactory ..> DiscountRule : construye
+    DiscountPolicy "1" --> "*" DiscountRuleDefinition
+```
+
+**Reglas de negocio.** Cada regla indica su condición de activación, su efecto, un criterio de aceptación con ejemplo numérico, y a qué caso de prueba obligatorio corresponde (los exigidos explícitamente para el motor de descuentos y las validaciones de stock).
+
+| #     | Regla                                                        | Condición                                                                                                                                                                     | Efecto                                                                                                                                                                                                                                                                                                                                                                             | Criterio de aceptación (ejemplo)                                                                                  | Caso de prueba obligatorio                                           |
+| :---- | :----------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------- |
+| RN-01 | Descuento de categoría                                       | El carrito contiene al menos un producto de categoría "Tecnología"                                                                                                            | 10% sobre el precio de esos productos específicos                                                                                                                                                                                                                                                                                                                                  | Producto Tecnología de $50 → descuento de categoría = $5                                                          | Regla base del motor de descuentos                                   |
+| RN-02 | Descuento por volumen                                        | El subtotal acumulado hasta ese punto de la cadena supera $100 USD                                                                                                            | 5% adicional sobre el total acumulado                                                                                                                                                                                                                                                                                                                                              | Subtotal acumulado $120 (tras RN-01) → descuento de volumen = $6                                                  | Regla base del motor de descuentos                                   |
+| RN-03 | Descuento por cupón                                          | Se ingresó un código y corresponde a un `Coupon` activo y no usado                                                                                                            | 15% adicional sobre el total acumulado                                                                                                                                                                                                                                                                                                                                             | `WELCOME2026` válido sobre subtotal acumulado $150 → descuento de cupón = $22.50                                  | Regla base del motor de descuentos                                   |
+| RN-04 | Tope de descuento                                            | Siempre se evalúa, como último eslabón de la cadena                                                                                                                           | El descuento acumulado (RN-01 a RN-03) nunca supera 35% del subtotal original; si lo excede, se trunca exactamente en 35%                                                                                                                                                                                                                                                          | Subtotal $200; RN-01+RN-02+RN-03 calculan 40% ($80) → se trunca a 35% ($70); total a pagar $130                   | **Tope del 35% de descuento superado**                               |
+| RN-05 | Cupón inválido, inactivo o ya usado                          | El código no existe, está inactivo o `used = true`                                                                                                                            | RN-03 no se aplica; las demás reglas se calculan igual; la compra puede confirmarse                                                                                                                                                                                                                                                                                                | Código `EXPIRED2024` inexistente → checkout se confirma sin el 15%, con RN-01 y RN-02 aplicados                   | **Cupón no registrado o expirado**                                   |
+| RN-06 | Validación de stock                                          | Ocurre únicamente en `PlaceOrder` (`/checkout`); nunca en `CalculateCartDiscounts` (`/cart/calculate`)                                                                        | Si alguna línea no tiene stock suficiente, se rechaza toda la operación (`409`) antes de calcular o persistir cualquier dato                                                                                                                                                                                                                                                       | Carrito pide 2 unidades de un producto con stock 1 → `409` antes de cualquier cálculo                             | **Intento de compra con stock insuficiente**                         |
+| RN-07 | Consumo de cupón                                             | Solo ocurre al confirmar la compra (`PlaceOrder`)                                                                                                                             | `Coupon.used` pasa a `true` de forma permanente, dentro de `DiscountPolicy`                                                                                                                                                                                                                                                                                                        | `WELCOME2026` aplicado en un `PlaceOrder` exitoso → un segundo intento con el mismo código se comporta como RN-05 | Regla base del motor de descuentos                                   |
+| RN-08 | Carrito vacío o inválido                                     | El carrito no tiene líneas, o una línea referencia un producto inexistente o cantidad ≤ 0                                                                                     | Se rechaza con `400` antes de cualquier cálculo, en ambas operaciones                                                                                                                                                                                                                                                                                                              | `items: []` → `400` tanto en `/cart/calculate` como en `/checkout`                                                | **Carrito vacío o con datos corruptos**                              |
+| RN-09 | Formato de cupón inválido                                    | El código no cumple el formato esperado (`@ValidCouponCode`, evaluado sobre `CartRequest`)                                                                                    | Se rechaza con `400` en el borde de la API, antes de llegar a cualquier caso de uso                                                                                                                                                                                                                                                                                                | Código `"ab"` → `400` sin llegar a `CalculateCartDiscountsService` ni `PlaceOrderService`                         | **Cupón no registrado o expirado** (variante de formato)             |
+| RN-10 | Consulta de stock por lote                                   | Validación de stock de las líneas de un carrito con más de un producto                                                                                                        | `ProductStockPort` recibe todas las líneas en una sola llamada; nunca una consulta por producto (evita N+1)                                                                                                                                                                                                                                                                        | Carrito con 5 líneas → 1 llamada a `ProductStockPort`, no 5                                                       | Requisito técnico que soporta RN-06                                  |
+| RN-11 | Orden de ejecución y consistencia dentro de una misma sesión | `PlaceOrder` ejecuta: validar stock → calcular descuentos → persistir la orden → decrementar stock, en ese orden, sin una transacción multi-documento que una las dos últimas | Si `decrementStock` falla (error de validación, timeout de Mongo, excepción no prevista) sin que el proceso se reinicie, la orden queda registrada con el stock sin descontar, y esa inconsistencia es visible mientras la aplicación siga corriendo. No aplica si el proceso se reinicia: al no haber persistencia real entre reinicios, ese escenario vuelve a los datos semilla | Ver ADR-18 para la limitación técnica de MongoDB y el camino de resolución futura                                 | Riesgo conocido, no cubierto por prueba automatizada en este alcance |
+
+**Manejo de errores.** `BusinessException` como raíz de las excepciones de negocio (`InsufficientStockException`, `EmptyCartException`, `InvalidCartItemException`), separadas de las excepciones técnicas. El tope de descuento del 35% no es una excepción (RN-04). `GlobalExceptionHandler` centraliza la traducción de excepciones de negocio y de errores de validación (`@ValidCouponCode`, Bean Validation sobre `CartRequest`) a respuestas HTTP tipadas; las excepciones no previstas se registran en el servidor y devuelven una respuesta genérica, sin exponer detalles internos.
