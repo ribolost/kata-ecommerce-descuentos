@@ -9,11 +9,11 @@
 
 #### Subdominios
 
-| Subdominio                        | Clasificación | Descripción                                                                                |
-| :-------------------------------- | :------------ | :----------------------------------------------------------------------------------------- |
-| **Proceso de Checkout (Order)**   | _Core_        | Validación de stock, orquestación de la compra y persistencia de la orden confirmada.      |
-| **Motor de Descuentos (Pricing)** | _Supporting_  | Cálculo secuencial de los descuentos acumulativos, con precedencia estricta y tope máximo. |
-| **Catálogo**                      | _Supporting_  | Consulta de productos y control del stock disponible.                                      |
+| Subdominio                         | Clasificación | Descripción                                                                                |
+| :--------------------------------- | :------------ | :----------------------------------------------------------------------------------------- |
+| **Proceso de Checkout (Order)**    | _Core_        | Validación de stock, orquestación de la compra y persistencia de la orden confirmada.      |
+| **Motor de Descuentos (Discount)** | _Supporting_  | Cálculo secuencial de los descuentos acumulativos, con precedencia estricta y tope máximo. |
+| **Catálogo (Catalog)**             | _Supporting_  | Consulta de productos y control del stock disponible.                                      |
 
 El Proceso de Checkout es el subdominio _Core_: completar una compra de forma consistente es lo que el negocio necesita resolver. El Motor de Descuentos y el Catálogo son _Supporting_: existen para que el checkout pueda completarse (saber cuánto cobrar, saber qué hay disponible), pero ninguno de los dos es, por sí mismo, el objetivo del negocio. No existe un subdominio _Generic_: no hay capacidades como autenticación, procesamiento de pagos externos o notificaciones dentro del alcance funcional.
 
@@ -23,7 +23,7 @@ El sistema opera en modalidad monousuario: no existe gestión de usuarios, sesio
 
 Se identifican dos _Bounded Contexts_:
 
-- **Checkout**: agrupa los subdominios Proceso de Checkout (_Core_) y Motor de Descuentos (_Supporting_). Ambos comparten el mismo lenguaje (`Cart`, `Order`, `DiscountBreakdown`), el mismo ciclo de despliegue y no existe necesidad de un límite de contexto real entre ellos. Internamente se organizan como paquetes independientes (`order` y `pricing`), de modo que la distinción _Core_/_Supporting_ quede reflejada en el código sin fragmentar el modelo en dos _Bounded Contexts_ separados.
+- **Checkout**: agrupa los subdominios Proceso de Checkout (_Core_) y Motor de Descuentos (_Supporting_). Ambos comparten el mismo lenguaje (`Cart`, `Order`, `DiscountBreakdown`), el mismo ciclo de despliegue y no existe necesidad de un límite de contexto real entre ellos. Internamente se organizan como paquetes independientes (`order` y `discount`), de modo que la distinción _Core_/_Supporting_ quede reflejada en el código sin fragmentar el modelo en dos _Bounded Contexts_ separados.
 - **Catalog**: lenguaje y reglas propias (`Product`, `Stock`, `Category`) independientes de las de Checkout.
 
 #### Context Map
