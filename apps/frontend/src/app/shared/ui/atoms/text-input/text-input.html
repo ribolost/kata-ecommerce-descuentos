@@ -1,0 +1,11 @@
+<input
+  type="text"
+  class="text-input"
+  [class.text-input--invalid]="invalid()"
+  [value]="value()"
+  [placeholder]="placeholder()"
+  [attr.aria-label]="ariaLabel() || null"
+  [attr.aria-invalid]="invalid() || null"
+  [disabled]="disabled()"
+  (input)="onInput($event)"
+/>

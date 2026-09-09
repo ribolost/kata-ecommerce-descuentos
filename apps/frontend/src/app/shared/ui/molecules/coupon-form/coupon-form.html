@@ -1,0 +1,23 @@
+<form class="coupon-form" (submit)="$event.preventDefault(); onSubmit()">
+  <ui-text-input
+    class="coupon-form__input"
+    [value]="codeControl.value"
+    placeholder="Código de cupón"
+    ariaLabel="Código de cupón"
+    [invalid]="codeControl.invalid && codeControl.touched"
+    [disabled]="pending()"
+    (valueChange)="onValueChange($event)"
+  />
+  <ui-button
+    class="coupon-form__submit"
+    type="submit"
+    variant="secondary"
+    [disabled]="pending()"
+  >Activar</ui-button>
+
+  @if (codeControl.invalid && codeControl.touched) {
+    <p class="coupon-form__message coupon-form__message--error">Ingresa un código de cupón.</p>
+  } @else if (notApplied()) {
+    <p class="coupon-form__message coupon-form__message--error">El cupón no es válido, está inactivo o ya fue utilizado.</p>
+  }
+</form>

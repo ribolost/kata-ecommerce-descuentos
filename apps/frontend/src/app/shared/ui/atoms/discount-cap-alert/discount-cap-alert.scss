@@ -1,0 +1,11 @@
+@use 'tokens' as *;
+
+.discount-cap-alert {
+  padding: $space-4;
+  border-radius: $radius-md;
+  background-color: $color-success-light;
+  color: $color-success;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+}

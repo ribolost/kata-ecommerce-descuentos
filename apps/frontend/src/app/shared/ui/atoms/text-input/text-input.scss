@@ -1,0 +1,25 @@
+@use 'tokens' as *;
+
+.text-input {
+  width: 100%;
+  min-height: $touch-target-min;
+  padding: $space-2 $space-3;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  font-size: 1rem;
+  color: $color-text;
+
+  &:focus {
+    outline: 2px solid $color-primary;
+    outline-offset: 1px;
+  }
+
+  &--invalid {
+    border-color: $color-error;
+  }
+
+  &:disabled {
+    background-color: $color-surface-alt;
+    color: $color-text-muted;
+  }
+}

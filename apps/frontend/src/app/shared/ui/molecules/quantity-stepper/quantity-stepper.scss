@@ -1,0 +1,11 @@
+@use 'tokens' as *;
+
+.quantity-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+
+  &--single {
+    justify-content: flex-end;
+  }
+}

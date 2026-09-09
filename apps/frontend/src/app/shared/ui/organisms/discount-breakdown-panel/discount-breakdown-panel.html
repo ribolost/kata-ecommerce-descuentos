@@ -1,0 +1,11 @@
+<section class="discount-breakdown-panel" aria-label="Desglose de descuentos">
+  @if (hasType('CATEGORY')) {
+    <ui-discount-line-item label="Descuento por categoría" [amount]="breakdown().categoryDiscountAmount" />
+  }
+  @if (hasType('VOLUME')) {
+    <ui-discount-line-item label="Descuento por volumen" [amount]="breakdown().volumeDiscountAmount" />
+  }
+  @if (hasType('COUPON')) {
+    <ui-discount-line-item label="Descuento por cupón" [amount]="breakdown().couponDiscountAmount" />
+  }
+</section>

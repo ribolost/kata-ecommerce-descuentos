@@ -1,0 +1,13 @@
+@use 'tokens' as *;
+
+.order-result-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-5;
+  padding: $space-5 $space-4 $space-7;
+
+  &__back {
+    align-self: center;
+  }
+}

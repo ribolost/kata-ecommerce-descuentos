@@ -1,0 +1,14 @@
+<div
+  class="quantity-stepper"
+  [class.quantity-stepper--single]="isEmpty()"
+>
+  @if (!isEmpty()) {
+    <ui-icon-button ariaLabel="Disminuir cantidad" (click)="decrement.emit()">−</ui-icon-button>
+    <ui-quantity-value [quantity]="quantity()" />
+  }
+  <ui-icon-button
+    ariaLabel="Agregar al carrito"
+    [disabled]="!canIncrement()"
+    (click)="increment.emit()"
+  >+</ui-icon-button>
+</div>

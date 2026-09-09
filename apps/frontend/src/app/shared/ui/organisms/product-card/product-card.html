@@ -1,0 +1,14 @@
+<article class="product-card" [class.product-card--in-cart]="isInCart()">
+  <div class="product-card__body">
+    <h3 class="product-card__title">{{ product().name }}</h3>
+    <p class="product-card__summary">{{ product().description }}</p>
+    <ui-price-tag class="product-card__price" [amount]="product().unitPrice" />
+  </div>
+  <ui-quantity-stepper
+    class="product-card__stepper"
+    [quantity]="quantity()"
+    [max]="product().stock"
+    (increment)="increment.emit()"
+    (decrement)="decrement.emit()"
+  />
+</article>

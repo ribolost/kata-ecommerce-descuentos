@@ -1,0 +1,140 @@
+@use 'tokens' as *;
+
+.cart-sidebar__toggle {
+  position: fixed;
+  right: $space-4;
+  bottom: $space-4;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  min-height: $touch-target-min;
+  padding: $space-3 $space-5;
+  border: none;
+  border-radius: $radius-lg;
+  background-color: $color-primary;
+  color: $color-surface;
+  font-weight: 700;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+
+  &-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 $space-1;
+    border-radius: 999px;
+    background-color: $color-surface;
+    color: $color-primary;
+    font-size: 0.75rem;
+  }
+
+  @include from-desktop {
+    display: none;
+  }
+}
+
+.cart-sidebar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  padding: $space-5;
+  background-color: $color-surface;
+  border-top-left-radius: $radius-lg;
+  border-top-right-radius: $radius-lg;
+  box-shadow: 0 -0.25rem 1rem rgba(0, 0, 0, 0.15);
+  transform: translateY(100%);
+  transition: transform 0.2s ease-in-out;
+  overflow-y: auto;
+
+  &--open {
+    transform: translateY(0);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $space-3;
+  }
+
+  &__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  &__close {
+    width: $touch-target-min;
+    height: $touch-target-min;
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+
+  &__empty {
+    color: $color-text-muted;
+    padding: $space-5 0;
+    text-align: center;
+  }
+
+  &__summary {
+    margin: $space-3 0 0;
+    padding-top: $space-3;
+    border-top: 1px solid $color-border;
+  }
+
+  &__summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 $space-1;
+
+    dt {
+      color: $color-text-muted;
+      font-size: 0.875rem;
+    }
+
+    &--total dt {
+      color: $color-text;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+  }
+
+  &__coupon {
+    display: block;
+    margin-top: $space-4;
+  }
+
+  &__pay-error {
+    margin: $space-3 0 0;
+    color: $color-error;
+    font-size: 0.875rem;
+  }
+
+  &__pay-button {
+    display: block;
+    width: 100%;
+    margin-top: $space-4;
+  }
+
+  @include from-desktop {
+    position: sticky;
+    inset: auto;
+    top: $space-5;
+    max-height: calc(100vh - #{$space-6});
+    border-radius: $radius-lg;
+    box-shadow: none;
+    border: 1px solid $color-border;
+    transform: none;
+
+    &__close {
+      display: none;
+    }
+  }
+}

@@ -1,0 +1,8 @@
+@use 'tokens' as *;
+
+.discount-breakdown-panel {
+  display: flex;
+  flex-direction: column;
+  padding: $space-3 0;
+  border-top: 1px solid $color-border;
+}

@@ -1,0 +1,17 @@
+@use 'tokens' as *;
+
+.coupon-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: $space-2;
+
+  &__message {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.8rem;
+
+    &--error {
+      color: $color-error;
+    }
+  }
+}

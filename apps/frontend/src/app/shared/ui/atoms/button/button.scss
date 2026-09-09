@@ -1,0 +1,48 @@
+@use 'tokens' as *;
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: $touch-target-min;
+  padding: $space-3 $space-5;
+  border: none;
+  border-radius: $radius-md;
+  background-color: $color-primary;
+  color: $color-surface;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover:not(:disabled) {
+    background-color: $color-primary-dark;
+  }
+
+  &:disabled {
+    background-color: $color-border;
+    color: $color-text-muted;
+    cursor: not-allowed;
+  }
+
+  &--secondary {
+    background-color: $color-surface;
+    color: $color-primary;
+    border: 1px solid $color-primary;
+
+    &:hover:not(:disabled) {
+      background-color: $color-primary-light;
+    }
+  }
+
+  &--text {
+    background-color: transparent;
+    color: $color-primary;
+    padding: $space-2 $space-3;
+    min-height: auto;
+
+    &:hover:not(:disabled) {
+      text-decoration: underline;
+    }
+  }
+}

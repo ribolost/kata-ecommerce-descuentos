@@ -1,0 +1,14 @@
+<article class="cart-item-row">
+  <div class="cart-item-row__info">
+    <p class="cart-item-row__name">{{ productName() }}</p>
+    <ui-price-tag class="cart-item-row__unit-price" [amount]="unitPrice()" size="sm" />
+  </div>
+  <ui-quantity-stepper
+    class="cart-item-row__stepper"
+    [quantity]="quantity()"
+    [max]="maxQuantity()"
+    (increment)="increment.emit()"
+    (decrement)="decrement.emit()"
+  />
+  <ui-price-tag class="cart-item-row__total" [amount]="lineTotal()" />
+</article>

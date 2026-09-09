@@ -1,0 +1,48 @@
+@use 'tokens' as *;
+
+.cart-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'info total'
+    'stepper stepper';
+  gap: $space-2;
+  padding: $space-4 0;
+  border-bottom: 1px solid $color-border;
+
+  &__info {
+    grid-area: info;
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__total {
+    grid-area: total;
+    justify-self: end;
+  }
+
+  &__stepper {
+    grid-area: stepper;
+    justify-self: start;
+  }
+
+  @include from-tablet {
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'info stepper total';
+    align-items: center;
+
+    &__stepper {
+      justify-self: center;
+    }
+  }
+}

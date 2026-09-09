@@ -1,0 +1,37 @@
+@use 'tokens' as *;
+
+.product-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: $space-4;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  background-color: $color-surface;
+  height: 100%;
+
+  &--in-cart {
+    border-color: $color-primary;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  &__summary {
+    font-size: 0.875rem;
+    color: $color-text-muted;
+  }
+
+  &__stepper {
+    align-self: flex-end;
+  }
+}

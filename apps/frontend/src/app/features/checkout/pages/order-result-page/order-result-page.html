@@ -1,0 +1,6 @@
+@if (order; as resolvedOrder) {
+  <div class="order-result-page">
+    <ui-order-summary [order]="resolvedOrder" />
+    <ui-button class="order-result-page__back" variant="secondary" routerLink="/">Volver al catálogo</ui-button>
+  </div>
+}

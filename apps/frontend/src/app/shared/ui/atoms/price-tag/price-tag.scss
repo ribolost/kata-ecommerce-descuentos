@@ -1,0 +1,16 @@
+@use 'tokens' as *;
+
+.price-tag {
+  font-weight: 700;
+  color: $color-text;
+  font-size: 1rem;
+
+  &--sm {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  &--lg {
+    font-size: 1.25rem;
+  }
+}

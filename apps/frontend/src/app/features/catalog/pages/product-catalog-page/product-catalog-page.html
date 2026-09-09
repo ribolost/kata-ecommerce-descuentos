@@ -1,0 +1,49 @@
+@if (orderNotFoundNotice()) {
+  <p class="product-catalog-page__notice" role="status">La orden solicitada no existe o ya no está disponible.</p>
+}
+
+@if (loadError()) {
+  <div class="product-catalog-page__error">
+    <p>No se pudo cargar el catálogo de productos.</p>
+    @if (loadingProducts()) {
+      <ui-loading-indicator label="Reintentando" />
+    } @else {
+      <ui-button variant="secondary" (click)="retryLoadProducts()">Reintentar</ui-button>
+    }
+  </div>
+} @else {
+  @if (cartState.discountError(); as discountError) {
+    <p class="product-catalog-page__notice" role="alert">
+      No se pudo actualizar el desglose de descuentos.
+      <ui-button variant="text" (click)="cartState.retryDiscountCalculation()">Reintentar</ui-button>
+    </p>
+  }
+  <ui-catalog-page-template>
+    <ui-product-grid
+      catalogSlot
+      [products]="products()"
+      [cartQuantities]="cartState.cartQuantities()"
+      (increment)="onIncrement($event)"
+      (decrement)="onDecrement($event)"
+    />
+    <ui-cart-sidebar
+      cartSlot
+      [lines]="cartLines()"
+      [subtotal]="cartState.subtotal()"
+      [total]="cartState.discountBreakdown()?.total ?? cartState.subtotal()"
+      [totalDiscountAmount]="cartState.discountBreakdown()?.totalDiscountAmount ?? 0"
+      [discountBreakdown]="cartState.discountBreakdown()?.discountBreakdown ?? null"
+      [appliedDiscounts]="cartState.discountBreakdown()?.appliedDiscounts ?? []"
+      [isCapped]="cartState.isCapped()"
+      [couponPending]="cartState.discountLoading()"
+      [couponNotApplied]="couponNotApplied()"
+      [payDisabled]="!cartState.hasItems()"
+      [payPending]="payPending()"
+      [payError]="payError()"
+      (incrementItem)="onIncrement($event)"
+      (decrementItem)="onDecrement($event)"
+      (activateCoupon)="onActivateCoupon($event)"
+      (pay)="onPay()"
+    />
+  </ui-catalog-page-template>
+}

@@ -1,0 +1,66 @@
+<section class="order-summary">
+  <header class="order-summary__header">
+    <h1 class="order-summary__title">Compra confirmada</h1>
+    <p class="order-summary__meta">Orden {{ order().id }} · {{ order().createdAt | date: 'medium' }}</p>
+  </header>
+
+  <div class="order-summary__content">
+    <ul class="order-summary__items">
+      @for (item of order().items; track item.productId) {
+        <li class="order-summary__item">
+          <div class="order-summary__item-info">
+            <p class="order-summary__item-name">{{ item.name }}</p>
+            <p class="order-summary__item-quantity">{{ item.quantity }} × <ui-price-tag [amount]="item.unitPrice" size="sm" /></p>
+          </div>
+          <ui-price-tag class="order-summary__item-total" [amount]="item.total" />
+        </li>
+      }
+    </ul>
+
+    <div class="order-summary__totals">
+      @if (isCapped()) {
+        <ui-discount-cap-alert [visible]="true" />
+      } @else {
+        <dl class="order-summary__discounts">
+          @if (hasCategoryDiscount()) {
+            <div class="order-summary__discount-row">
+              <dt>Descuento por categoría</dt>
+              <dd><ui-price-tag [amount]="order().discountBreakdown.categoryDiscountAmount" size="sm" /></dd>
+            </div>
+          }
+          @if (hasVolumeDiscount()) {
+            <div class="order-summary__discount-row">
+              <dt>Descuento por volumen</dt>
+              <dd><ui-price-tag [amount]="order().discountBreakdown.volumeDiscountAmount" size="sm" /></dd>
+            </div>
+          }
+          @if (hasCouponDiscount()) {
+            <div class="order-summary__discount-row">
+              <dt>Descuento por cupón</dt>
+              <dd><ui-price-tag [amount]="order().discountBreakdown.couponDiscountAmount" size="sm" /></dd>
+            </div>
+          }
+        </dl>
+      }
+
+      <dl class="order-summary__summary">
+        <div class="order-summary__summary-row">
+          <dt>Subtotal</dt>
+          <dd><ui-price-tag [amount]="order().subtotal" size="sm" /></dd>
+        </div>
+        <div class="order-summary__summary-row">
+          <dt>Descuento total</dt>
+          <dd><ui-price-tag [amount]="order().totalDiscountAmount" size="sm" /></dd>
+        </div>
+        <div class="order-summary__summary-row order-summary__summary-row--total">
+          <dt>Total pagado</dt>
+          <dd><ui-price-tag [amount]="order().total" size="lg" /></dd>
+        </div>
+      </dl>
+
+      @if (order().couponCode) {
+        <p class="order-summary__coupon">Cupón aplicado: {{ order().couponCode }}</p>
+      }
+    </div>
+  </div>
+</section>

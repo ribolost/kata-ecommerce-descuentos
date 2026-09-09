@@ -1,0 +1,87 @@
+<button
+  type="button"
+  class="cart-sidebar__toggle"
+  (click)="toggleOpen()"
+  [attr.aria-expanded]="isOpen()"
+  aria-controls="cart-sidebar-panel"
+>
+  Carrito
+  @if (itemCount() > 0) {
+    <span class="cart-sidebar__toggle-badge">{{ itemCount() }}</span>
+  }
+</button>
+
+<aside
+  id="cart-sidebar-panel"
+  class="cart-sidebar"
+  [class.cart-sidebar--open]="isOpen()"
+>
+  <header class="cart-sidebar__header">
+    <h2 class="cart-sidebar__title">Tu carrito</h2>
+    <button type="button" class="cart-sidebar__close" (click)="close()" aria-label="Cerrar carrito">×</button>
+  </header>
+
+  <div class="cart-sidebar__list">
+    @if (isEmpty()) {
+      <p class="cart-sidebar__empty">Tu carrito está vacío.</p>
+    } @else {
+      @for (line of lines(); track line.productId) {
+        <ui-cart-item-row
+          [productName]="line.name"
+          [unitPrice]="line.unitPrice"
+          [quantity]="line.quantity"
+          [lineTotal]="line.lineTotal"
+          [maxQuantity]="line.maxQuantity"
+          (increment)="incrementItem.emit(line.productId)"
+          (decrement)="decrementItem.emit(line.productId)"
+        />
+      }
+    }
+  </div>
+
+  @if (!isEmpty()) {
+    @if (isCapped()) {
+      <ui-discount-cap-alert [visible]="true" />
+    } @else if (discountBreakdown(); as breakdown) {
+      <ui-discount-breakdown-panel [breakdown]="breakdown" [appliedDiscounts]="appliedDiscounts()" />
+    }
+
+    <dl class="cart-sidebar__summary">
+      <div class="cart-sidebar__summary-row">
+        <dt>Subtotal</dt>
+        <dd><ui-price-tag [amount]="subtotal()" size="sm" /></dd>
+      </div>
+      <div class="cart-sidebar__summary-row">
+        <dt>Descuento total</dt>
+        <dd><ui-price-tag [amount]="totalDiscountAmount()" size="sm" /></dd>
+      </div>
+      <div class="cart-sidebar__summary-row cart-sidebar__summary-row--total">
+        <dt>Total</dt>
+        <dd><ui-price-tag [amount]="total()" size="lg" /></dd>
+      </div>
+    </dl>
+
+    <ui-coupon-form
+      class="cart-sidebar__coupon"
+      [pending]="couponPending()"
+      [notApplied]="couponNotApplied()"
+      (activate)="activateCoupon.emit($event)"
+    />
+
+    @if (payError()) {
+      <p class="cart-sidebar__pay-error" role="alert">{{ payError() }}</p>
+    }
+
+    <ui-button
+      class="cart-sidebar__pay-button"
+      [disabled]="payDisabled() || payPending()"
+      (click)="pay.emit()"
+    >
+      @if (payPending()) {
+        <ui-loading-indicator label="Procesando" />
+      } @else {
+        Pagar
+      }
+    </ui-button>
+  }
+</aside>

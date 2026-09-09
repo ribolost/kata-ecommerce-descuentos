@@ -1,0 +1,29 @@
+@use 'tokens' as *;
+
+.catalog-page-template {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+  max-width: 90rem;
+  margin: 0 auto;
+  padding: $space-4;
+
+  &__catalog {
+    min-width: 0;
+  }
+
+  @include from-desktop {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: $space-6;
+
+    &__catalog {
+      flex: 1;
+    }
+
+    &__cart {
+      width: 22rem;
+      flex-shrink: 0;
+    }
+  }
+}
