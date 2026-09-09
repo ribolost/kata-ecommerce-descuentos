@@ -31,6 +31,7 @@
 - **5. [Consideraciones de Evolución Arquitectónica](#5-consideraciones-de-evolución-arquitectónica)**
   - 5.1 [Frontend](#51-frontend)
   - 5.2 [Backend](#52-backend)
+  - 5.3 [Dominio](#53-dominio)
 
 ---
 
@@ -92,7 +93,7 @@ Checkout -->|"uses"| Catalog
 | `Product`                | _Aggregate Root_ | `Product`        | Ítem vendible, con stock que cambia en el tiempo.                                |
 | `DiscountPolicy`         | _Aggregate Root_ | `DiscountPolicy` | Conjunto de reglas de descuento vigentes.                                        |
 | `Order`                  | _Aggregate Root_ | `Order`          | Compra confirmada.                                                               |
-| `Coupon`                 | _Aggregate Root_ | `Coupon`         | Código promocional, con estado de uso: activo o no, usado o no.                  |
+| `Coupon`                 | Entidad interna  | `DiscountPolicy` | Código promocional, con estado de uso: activo o no, usado o no.                  |
 | `OrderLine`              | Entidad interna  | `Order`          | Línea de producto dentro de una orden, con cantidad y precio unitario congelado. |
 | `DiscountRuleDefinition` | Entidad interna  | `DiscountPolicy` | Definición de una regla de descuento configurada (orden, tipo, valor).           |
 
@@ -102,35 +103,38 @@ Checkout -->|"uses"| Catalog
 
 ### 1.6 Aggregates
 
-| Aggregate          | Subdominio                         | Aggregate Root   | Responsabilidad                                                                                  | Invariantes                                                                                                                                                                                                                  |
-| :----------------- | :--------------------------------- | :--------------- | :----------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Product**        | Catálogo (_Supporting_)            | `Product`        | Representa el ítem vendible y su stock disponible.                                               | `stock ≥ 0`; `unitPrice > 0`.                                                                                                                                                                                                |
-| **DiscountPolicy** | Motor de Descuentos (_Supporting_) | `DiscountPolicy` | Agrupa el conjunto ordenado de reglas de descuento vigentes como una unidad de consistencia.     | No existen dos reglas con el mismo `order`; cada regla tiene un `value` en `(0, 1]`, que representa el porcentaje de descuento; el conjunto cubre exactamente los tipos `CATEGORY`, `VOLUME`, `COUPON` y `CAP`.              |
-| **Order**          | Proceso de Checkout (_Core_)       | `Order`          | Representa una compra confirmada, con su desglose de descuentos y el precio congelado por línea. | `total = subtotal − totalDiscountAmount`; `totalDiscountAmount ≤ 0.35 × subtotal`; toda `Order` tiene al menos una `OrderLine`; cada `OrderLine.quantity` fue validada contra el stock disponible al momento de su creación. |
-| **Coupon**         | Motor de Descuentos (_Supporting_) | `Coupon`         | Representa un código promocional válido, con su porcentaje de descuento y su estado de uso.      | Solo puede aplicarse si `active = true` y `used = false`; una vez aplicado en una compra confirmada, `used` pasa a `true` de forma permanente y no puede revertirse.                                                         |
+| Aggregate          | Subdominio                         | Aggregate Root   | Responsabilidad                                                                                                     | Invariantes                                                                                                                                                                                                                                                                                                                                                                                        |
+| :----------------- | :--------------------------------- | :--------------- | :------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Product**        | Catálogo (_Supporting_)            | `Product`        | Representa el ítem vendible y su stock disponible.                                                                  | `stock ≥ 0`; `unitPrice > 0`.                                                                                                                                                                                                                                                                                                                                                                      |
+| **DiscountPolicy** | Motor de Descuentos (_Supporting_) | `DiscountPolicy` | Agrupa el conjunto ordenado de reglas de descuento vigentes, incluido el `Coupon`, como una unidad de consistencia. | No existen dos reglas con el mismo `order`; cada regla tiene un `value` en `(0, 1]`, que representa el porcentaje de descuento; el conjunto cubre exactamente los tipos `CATEGORY`, `VOLUME`, `COUPON` y `CAP`; un `Coupon` solo puede aplicarse si `active = true` y `used = false`, y una vez aplicado en una compra confirmada, `used` pasa a `true` de forma permanente y no puede revertirse. |
+| **Order**          | Proceso de Checkout (_Core_)       | `Order`          | Representa una compra confirmada, con su desglose de descuentos y el precio congelado por línea.                    | `total = subtotal − totalDiscountAmount`; `totalDiscountAmount ≤ 0.35 × subtotal`; toda `Order` tiene al menos una `OrderLine`; cada `OrderLine.quantity` fue validada contra el stock disponible al momento de su creación.                                                                                                                                                                       |
 
 **Aclaraciones**
 
-- La regla de tipo `COUPON` dentro de `DiscountPolicy` define únicamente su posición en la precedencia (el descuento por cupón se evalúa en tercer lugar). El código promocional, su porcentaje y su estado de uso son responsabilidad del _Aggregate_ `Coupon`. Esta separación responde a que el orden de precedencia lo define el negocio una vez, mientras que el estado de un cupón cambia con cada compra que lo utiliza.
+- `Coupon` se modela como entidad interna de `DiscountPolicy`, no como _Aggregate_ independiente: no hay ningún _Command_ que lo cree, active o desactive de forma aislada, y la razón original para separarlo (proteger su actualización contra escritura concurrente) no aplica en un sistema monousuario. Ver ADR-14.
 
 ### 1.7 Value Objects
 
-| Value Object        | Descripción                                                                                                                                                                                                                                                                          |
-| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Money`             | Monto monetario, siempre no negativo. Evita que cualquier cálculo de precio o descuento use un número suelto sin esa garantía.                                                                                                                                                       |
-| `Percentage`        | Valor porcentual restringido al rango `[0,1]`. Evita que una tasa de descuento mal calculada (negativa o mayor a 1) llegue a representarse en el sistema.                                                                                                                            |
-| `CouponCode`        | Representa el código de un cupón (por ejemplo, `WELCOME2026`). Normaliza el valor ingresado (sin distinguir mayúsculas/minúsculas ni espacios) y valida su formato. Es el identificador de negocio del _Aggregate_ `Coupon`; no tiene estado propio ni conoce si el cupón fue usado. |
-| `DiscountBreakdown` | Resultado inmutable del cálculo de descuentos: los montos por tipo de descuento y el total resultante. Una vez calculado, no se modifica.                                                                                                                                            |
+| Value Object        | Descripción                                                                                                                                                         |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Money`             | Monto monetario, siempre no negativo. Evita que cualquier cálculo de precio o descuento use un número suelto sin esa garantía.                                      |
+| `Percentage`        | Valor porcentual restringido al rango `[0,1]`. Evita que una tasa de descuento mal calculada (negativa o mayor a 1) llegue a representarse en el sistema.           |
+| `CouponCode`        | Representa el código de un cupón (por ejemplo, `WELCOME2026`). Normaliza el valor ingresado (sin distinguir mayúsculas/minúsculas ni espacios) y valida su formato. |
+| `DiscountBreakdown` | Resultado inmutable del cálculo de descuentos: los montos por tipo de descuento y el total resultante. Una vez calculado, no se modifica.                           |
+
+**Aclaraciones**
+
+- `Money`, `Percentage` y `CouponCode` se documentan aquí como conceptos del modelo, pero no se implementan como clases propias: sus reglas (monto no negativo, rango `[0,1]`, formato del código) se validan de forma declarativa sobre los DTOs de entrada, en el borde de la API. Esto implica que la garantía solo se verifica ahí — un valor fuera de rango producido en un cálculo intermedio dentro del dominio no pasa por ninguna validación. Ver ADR-17.
 
 ### 1.8 Invariantes
 
-| Invariante                                         | Dónde se garantiza                                                                                              |
-| :------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
-| `totalDiscountAmount ≤ 0.35 × subtotal`            | La regla de tope, último eslabón de la cadena de descuentos.                                                    |
-| `total = subtotal − totalDiscountAmount`           | `Order` (_Aggregate Root_): no permite construirse con un total inconsistente.                                  |
-| `stock ≥ 0` tras decremento                        | `Product` (_Aggregate Root_): rechaza cualquier decremento que deje el stock en negativo.                       |
-| Orden y unicidad de `DiscountRuleDefinition.order` | `DiscountPolicy` (_Aggregate Root_): no permite agregar una regla que repita un `order` ya existente.           |
-| Un `Coupon` usado no puede volver a aplicarse      | `Coupon` (_Aggregate Root_): una vez marcado como usado, ninguna operación posterior puede revertir ese estado. |
+| Invariante                                         | Dónde se garantiza                                                                                                          |
+| :------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| `totalDiscountAmount ≤ 0.35 × subtotal`            | La regla de tope, último eslabón de la cadena de descuentos.                                                                |
+| `total = subtotal − totalDiscountAmount`           | `Order` (_Aggregate Root_): no permite construirse con un total inconsistente.                                              |
+| `stock ≥ 0` tras decremento                        | `Product` (_Aggregate Root_): rechaza cualquier decremento que deje el stock en negativo.                                   |
+| Orden y unicidad de `DiscountRuleDefinition.order` | `DiscountPolicy` (_Aggregate Root_): no permite agregar una regla que repita un `order` ya existente.                       |
+| Un `Coupon` usado no puede volver a aplicarse      | `DiscountPolicy` (_Aggregate Root_): ninguna operación posterior puede revertir el `used` de una de sus entidades `Coupon`. |
 
 ### 1.9 Commands
 
@@ -149,7 +153,7 @@ Checkout -->|"uses"| Catalog
 
 ### 2.1 Visión general
 
-El backend se organiza como un **monolito modular**: una única aplicación desplegable, dividida en los Bounded Contexts `checkout` (con los paquetes internos `discount` y `order`) y `catalog`, cada uno con la organización interna que su complejidad exige. La relación entre `checkout` y `catalog` sigue el `Customer/Supplier` definido en el _Context Map_ (ver [Dominio](#1-dominio-ddd)): `checkout` consume las capacidades de `catalog`, sin acceder directamente a sus clases internas. El frontend es una unidad de despliegue independiente: se comunica con el backend exclusivamente por HTTP/REST, sin compartir proceso ni ciclo de despliegue con él.
+El backend se organiza como un **monolito modular**: una única aplicación desplegable, dividida en los Bounded Contexts `checkout` (con los paquetes internos `discount` y `order`) y `catalog`, cada uno con la organización interna que su complejidad exige. La relación entre `checkout` y `catalog` sigue el `Customer/Supplier` definido en el _Context Map_ (ver Dominio): `checkout` consume las capacidades de `catalog`, sin acceder directamente a sus clases internas. El frontend es una unidad de despliegue independiente: se comunica con el backend exclusivamente por HTTP/REST, sin compartir proceso ni ciclo de despliegue con él.
 
 ### 2.2 Backend
 
@@ -159,22 +163,13 @@ Dos Bounded Contexts: `checkout`, dividido internamente en el paquete `order` (s
 
 La aplicación Angular se organiza por Bounded Context: cada _Page_ de _Atomic Design_ corresponde a uno de los Bounded Contexts del dominio (`catalog`, `checkout`), sin acoplamiento cruzado más allá de interfaces bien definidas — el catálogo no necesita saber nada del carrito, y viceversa.
 
-El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el servidor para reducir el tiempo hasta la primera pintura, y la interacción del carrito se hidrata en el cliente una vez cargada la página. El detalle completo está en [Arquitectura interna](#32-frontend).
+El renderizado se resuelve de forma híbrida: la carga inicial se ejecuta en el servidor para reducir el tiempo hasta la primera pintura, y la interacción del carrito se hidrata en el cliente una vez cargada la página. El detalle completo está en "Arquitectura interna".
 
 ### 2.4 Selección de tecnologías
 
 - **Angular 22.** Integra TypeScript como su lenguaje estándar, con tipado fuerte de punta a punta y detección de errores de contrato en tiempo de compilación. Es un framework integral: enrutamiento, formularios, cliente HTTP, inyección de dependencias y animaciones vienen incluidos, sin depender de que el equipo integre librerías externas para cada pieza. Soporta de forma nativa el renderizado en servidor y la federación de módulos, por lo que la eventual evolución hacia microfrontends no requiere cambiar de framework ni introducir herramientas adicionales.
 - **Java 21 / Spring Boot 4.1.x.** Spring Boot ofrece un ecosistema ya integrado para construir aplicaciones REST, seguras y desplegables en la nube (Spring Web, Spring Data, Spring Security, Spring Cloud), lo que evita ensamblar manualmente piezas sueltas para necesidades que la mayoría de backends terminan teniendo. Java aporta tipado fuerte y verificación en compilación. La migración futura hacia microservicios es de bajo costo dentro de este mismo ecosistema, y el lenguaje ofrece un modelo de concurrencia maduro y robusto, con buen rendimiento bajo alta carga de peticiones.
 - **MongoDB (no relacional).** El checkout de este sistema tiene un patrón de acceso de lectura/escritura frecuente sobre documentos autocontenidos (una orden con sus líneas y su desglose de descuentos, un producto con su stock) y no requiere transacciones multi-tabla ni integridad referencial estricta entre entidades — a diferencia de un módulo de pagos real, donde la integridad transaccional es el requisito no negociable, aquí lo crítico es la velocidad de lectura/escritura y que cada documento sea internamente consistente. Un modelo documental resuelve eso de forma más directa que uno relacional, sin joins ni normalización, y cada `Aggregate` se persiste como una única unidad coherente con su propio límite de consistencia. Al ser un monolito modular, se usa una única base de datos MongoDB compartida por ambos Bounded Contexts (cada uno con sus propias colecciones), no una base de datos por módulo.
-
-  2.5 Requerimientos no funcionales
-  Calidad y seguridad del código. El diseño sigue el principio de Security by design.
-  100% de tipado fuerte en backend y frontend — cero usos de tipos dinámicos o genéricos sin justificación técnica explícita, verificable con una herramienta de análisis estático como SonarQube.
-  Contratos de entrada tipados mediante DTOs y validados de forma declarativa (Bean Validation en backend, formularios tipados en frontend), de modo que un dato inválido o mal formado se rechace antes de llegar a la lógica de dominio.
-  Un agente de IA ejecuta las herramientas de análisis SAST (Static Application Security Testing), SCA (Software Composition Analysis) y Secret Scanning antes de integrar cambios, sin vulnerabilidades críticas ni secretos expuestos sin remediar.
-  Testabilidad, tanto en backend como en frontend.
-  Cobertura mínima del 80% en las capas lógicas esenciales (backend: motor de descuentos, validaciones de stock; frontend: estado del carrito, validación de la alerta de tope) como piso obligatorio, no como techo — el proyecto puede ampliar la cobertura a otras capas sin restricción.
-  Casos de borde obligatorios: el tope del 35% de descuento superado, carritos vacíos o con datos corruptos, cupones no registrados o expirados, e intentos de compra con stock insuficiente.
 
 ### 2.5 Requerimientos no funcionales
 
@@ -215,3 +210,99 @@ C4Container
 ```
 
 ---
+
+## 3. Arquitectura interna
+
+### 3.1 Backend
+
+**Estructura de proyecto:**
+
+```
+kata-ecommerce-descuentos/backend/
+└── src/main/java/com/ribolost/pruebastecnicas/kataecommerce/
+    ├── catalog/
+    │   ├── domain/
+    │   │   └── Product.java
+    │   ├── application/
+    │   │   └── ProductService.java
+    │   └── infrastructure/
+    │       ├── controller/
+    │       │   └── ProductController.java
+    │       └── repository/
+    │           ├── ProductRepository.java
+    │           └── ProductDocument.java
+    │
+    ├── checkout/
+    │   ├── discount/                              (subdominio Supporting — capas con nomenclatura de Hexagonal)
+    │   │   ├── domain/
+    │   │   │   ├── DiscountPolicy.java
+    │   │   │   ├── DiscountRuleDefinition.java
+    │   │   │   ├── DiscountBreakdown.java
+    │   │   │   ├── DiscountContext.java
+    │   │   │   ├── Coupon.java                    (entidad interna de DiscountPolicy)
+    │   │   │   └── rules/
+    │   │   │       ├── DiscountRule.java
+    │   │   │       ├── CategoryDiscountRule.java
+    │   │   │       ├── VolumeDiscountRule.java
+    │   │   │       ├── CouponDiscountRule.java
+    │   │   │       ├── MaxDiscountCapRule.java
+    │   │   │       └── DiscountChainFactory.java
+    │   │   ├── application/
+    │   │   │   └── DiscountService.java
+    │   │   └── infrastructure/
+    │   │       └── repository/
+    │   │           ├── DiscountPolicyRepository.java
+    │   │           └── DiscountPolicyDocument.java  (Coupon embebido dentro del documento)
+    │   │
+    │   └── order/                                 (subdominio Core — Hexagonal completa)
+    │       ├── domain/
+    │       │   ├── Order.java
+    │       │   └── OrderLine.java
+    │       ├── application/
+    │       │   ├── PlaceOrderService.java
+    │       │   ├── CalculateCartDiscountsService.java
+    │       │   ├── port/
+    │       │   │   ├── in/
+    │       │   │   │   ├── PlaceOrderUseCase.java
+    │       │   │   │   └── CalculateCartDiscountsUseCase.java
+    │       │   │   └── out/
+    │       │   │       ├── OrderRepository.java
+    │       │   │       ├── ProductStockPort.java
+    │       │   │       └── DiscountCalculationPort.java
+    │       │   ├── dto/
+    │       │   │   ├── in/
+    │       │   │   │   ├── CartItemRequest.java
+    │       │   │   │   └── CartRequest.java
+    │       │   │   └── out/
+    │       │   │       ├── OrderLineResponse.java
+    │       │   │       ├── DiscountBreakdownResponse.java
+    │       │   │       └── OrderConfirmationResponse.java
+    │       │   └── validation/
+    │       │       ├── ValidCouponCode.java
+    │       │       └── CouponCodeFormatValidator.java
+    │       └── infrastructure/
+    │           ├── adapter/
+    │           │   ├── in/web/
+    │           │   │   └── CheckoutController.java
+    │           │   └── out/
+    │           │       ├── OrderRepositoryAdapter.java
+    │           │       ├── CatalogStockAdapter.java
+    │           │       └── DiscountCalculationAdapter.java
+    │           └── persistence/
+    │               ├── OrderDocument.java
+    │               └── OrderLineDocument.java
+    │
+    └── shared/
+        └── error/
+            ├── BusinessException.java
+            ├── InsufficientStockException.java
+            ├── EmptyCartException.java
+            ├── InvalidCartItemException.java
+            └── GlobalExceptionHandler.java
+```
+
+**Módulo `catalog`.** Expone el listado de productos con su stock y permite que `checkout` consulte y decremente stock de forma controlada. No conoce nada sobre descuentos ni órdenes.
+
+**Módulo `discount`.** No consulta `catalog` por su cuenta: `DiscountService` ejecuta la cadena sobre los datos que `order` ya le resolvió. No tiene controlador propio — su caso de uso se expone a través de `CheckoutController`, en `order`.
+
+**Módulo `order`.** `OrderRepositoryAdapter` implementa `OrderRepository` contra MongoDB; `CatalogStockAdapter` implementa `ProductStockPort` invocando en proceso al `ProductService` de `catalog`, con una operación por lote (evita N+1, ver RN-10); `DiscountCalculationAdapter` implementa `DiscountCalculationPort` invocando al `DiscountService` de `discount`. `CheckoutController` expone `/cart/calculate` (`CalculateCartDiscountsUseCase`) y `/checkout` (`PlaceOrderUseCase`).
