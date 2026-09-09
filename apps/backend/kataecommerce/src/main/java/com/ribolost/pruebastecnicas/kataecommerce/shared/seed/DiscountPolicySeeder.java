@@ -51,14 +51,12 @@ public class DiscountPolicySeeder {
             return;
         }
 
-        Coupon coupon = new Coupon(DEFAULT_COUPON_CODE, true, false, null);
+        Coupon coupon = new Coupon(DEFAULT_COUPON_CODE, true, false);
 
         DiscountRuleDefinition categoryRule = new DiscountRuleDefinition(1, DiscountType.CATEGORY, CATEGORY_DISCOUNT_VALUE, null);
         DiscountRuleDefinition volumeRule = new DiscountRuleDefinition(2, DiscountType.VOLUME, VOLUME_DISCOUNT_VALUE, null);
         DiscountRuleDefinition couponRule = new DiscountRuleDefinition(3, DiscountType.COUPON, COUPON_DISCOUNT_VALUE, coupon);
         DiscountRuleDefinition capRule = new DiscountRuleDefinition(4, DiscountType.TOTAL, MAX_DISCOUNT_CAP_VALUE, null);
-
-        coupon.setDiscountRule(couponRule);
 
         DiscountPolicyDocument document = new DiscountPolicyDocument(
                 UUID.randomUUID().toString(),

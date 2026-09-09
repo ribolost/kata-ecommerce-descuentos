@@ -6,16 +6,13 @@ public class Coupon {
     private boolean active;
     private boolean used;
 
-    private DiscountRuleDefinition discountRule;
-
     public Coupon() {
     }
 
-    public Coupon(String code, boolean active, boolean used, DiscountRuleDefinition discountRule) {
+    public Coupon(String code, boolean active, boolean used) {
         this.code = code;
         this.active = active;
         this.used = used;
-        this.discountRule = discountRule;
     }
 
     public String getCode() {
@@ -40,13 +37,5 @@ public class Coupon {
 
     public void setUsed(boolean used) {
         this.used = used;
-    }
-
-    public DiscountRuleDefinition getDiscountRule() {
-        return discountRule;
-    }
-
-    public void setDiscountRule(DiscountRuleDefinition discountRule) {
-        this.discountRule = discountRule;
     }
 }
