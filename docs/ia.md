@@ -136,6 +136,7 @@ definidos en el contrato de uso (diseño, implementación, pruebas, transversal 
 | -------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Implementación | Refinamiento del módulo `order` (validación de stock, mappers, caso de uso `GetOrder`) | Se pidió modificar los archivos existentes de `order` para: lanzar excepción de negocio cuando falla el decremento de stock (manejada luego por el `GlobalExceptionHandler`), extraer la lógica de mapeo a `infrastructure/mappers`, y crear `GetOrder` como caso de uso nuevo implementado por `PlaceOrderService`, propagando una excepción de negocio si la orden no existe. |
 | Diseño         | Generación de estructura de carpetas del backend a partir de la arquitectura           | Se pidió generar, a partir de la sección "Arquitectura interna" del documento de arquitectura, el árbol de carpetas y archivos `.java` vacíos del backend (`catalog`, `checkout/discount`, `checkout/order`, `shared/error`), excluyendo la ruta `src/main/java/...`.                                                                                                           |
+| Implementación | Implementación del frontend (Angular 22) — `prompts/generacion-front.md`               | System prompt para construir el frontend completo a partir de `arq.md` y del documento de arquitectura interna de frontend, bajo un enfoque Spec Driven Development. Define la implementación de Atomic Design (atoms, molecules, organisms, templates, pages), Mobile First, BEM y Signals; el estado único del carrito (sin copias locales en catálogo, sidebar o cards); la visualización de `appliedDiscounts` (`CATEGORY`, `VOLUME`, `COUPON`, `TOTAL`) y el mensaje del límite del 35%; el flujo de cupón, la creación de la orden, routing con lazy loading, interceptors funcionales y manejo de errores por capa; e incluye reglas explícitas anti-alucinación para no inventar endpoints, payloads, campos ni reglas de negocio fuera de lo definido en los contratos. |
 
 ---
 
@@ -191,12 +192,18 @@ diario del desarrollador.
 
 ### Comparativa de aporte por rama
 
-Script para ejecutar sobre una rama específica (`<rama>`), que compara commits y líneas de código entre IA y
-desarrollador, y calcula el porcentaje de cada uno respetando los trailers `AI-Assisted: true` / `AI-Stage` definidos
-en la metodología:
+Script para ejecutar sobre una rama específica, que compara commits y líneas de código entre IA y desarrollador, y
+calcula el porcentaje de cada uno respetando los trailers `AI-Assisted: true` / `AI-Stage` definidos en la
+metodología. A diferencia de una versión anterior de este script, la rama ya no se deja como marcador de posición
+(`<rama>`) dentro del cuerpo del script —eso impedía ejecutarlo directamente, porque al copiarlo y pegarlo tal cual
+`git log` recibía literalmente `<rama>` como referencia y fallaba con `unknown revision`—. Ahora la rama se recibe
+como parámetro del script (`$1`), con la rama actual como valor por defecto si no se indica ninguna:
 
 ```bash
-RAMA=<rama>
+#!/usr/bin/env bash
+set -euo pipefail
+
+RAMA="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 
 # --- Commits ---
 TOTAL_COMMITS=$(git log "$RAMA" --oneline | wc -l)
@@ -226,21 +233,23 @@ awk -v ci="$COMMITS_IA" -v ct="$TOTAL_COMMITS" -v li="$LINEAS_IA" -v lt="$LINEAS
 }'
 ```
 
+Para ejecutarlo, guárdalo como archivo (por ejemplo `scripts/comparativa-rama.sh`), dale permisos de ejecución y
+llámalo indicando la rama a analizar; sobre Windows requiere una shell compatible con Bash (Git Bash o WSL), ya que
+usa `wc`, `awk` y aritmética de Bash:
+
+```bash
+chmod +x scripts/comparativa-rama.sh
+./scripts/comparativa-rama.sh feature/backend-ia
+```
+
+Si se omite el argumento, el script toma la rama actualmente activa (`git rev-parse --abbrev-ref HEAD`).
+
 - `AI-Assisted: true` agrupa tanto commits `[ai-scaffold]` como refinamientos asistidos por IA, tal como se define en
   la metodología; por eso el porcentaje de commits/líneas "con IA" incluye ambos casos.
 - El porcentaje por **líneas** es más representativo que el de commits, ya que un commit de refinamiento pequeño no
   pesa igual que un scaffold que generó cientos de líneas.
 - Para comparar el aporte de IA únicamente contra el refinamiento manual posterior (sin contar el scaffold inicial),
-  se puede acotar el rango con `git log <scaffold-commit-hash>..HEAD` en lugar de `$RAMA` completo.
-
-### Resumen final
-
-| Métrica                                                                | Valor |
-| ---------------------------------------------------------------------- | ----- |
-| Total de commits                                                       |       |
-| Commits con asistencia de IA                                           |       |
-| Commits 100% manuales                                                  |       |
-| % de líneas modificadas sobre scaffolds de IA (ejemplo representativo) |       |
+  se puede acotar el rango con `git log <scaffold-commit-hash>..HEAD` en lugar de la rama completa.
 
 ---
 
@@ -249,7 +258,7 @@ awk -v ci="$COMMITS_IA" -v ct="$TOTAL_COMMITS" -v li="$LINEAS_IA" -v lt="$LINEAS
 Registro de contenido generado por IA que fue rechazado o corregido por el desarrollador, junto con el criterio técnico
 de ingeniería que motivó la corrección.
 
-| Módulo / Archivo | Sugerencia de la IA | Motivo del rechazo / corrección |
-| ---------------- | ------------------- | ------------------------------- |
-|                  |                     |                                 |
-|                  |                     |                                 |
+| Módulo / Archivo                                                      | Sugerencia de la IA                                                                                                                                                                                                        | Motivo del rechazo / corrección                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Diseño de arquitectura — Agregados DDD (`Coupon`)                       | Al consultar sugerencias de diseño sobre los agregados del modelo DDD, la IA propuso modelar `Coupon` como un agregado independiente, con su propia raíz e identidad dentro del dominio de descuentos.                    | Se rechazó porque un agregado se justifica cuando existe una entidad con ciclo de vida e identidad propios que deben persistirse y cuya consistencia transaccional debe protegerse como una unidad. En este dominio, `Coupon` no se persiste como entidad independiente ni requiere una raíz de agregado propia: su validación (existencia y vigencia) es una regla que se resuelve en el contexto de la aplicación de descuentos, no un ciclo de vida autónomo. Elevarlo a agregado habría introducido complejidad estructural sin aportar valor de consistencia transaccional, contradiciendo el criterio de "agregado mínimo necesario" de DDD.                                                                        |
+| `checkout/discount` — Fábrica de reglas de descuento (`Discount Factory`) | Al revisar el código fuente del módulo `discount`, la IA implementó la fábrica encargada de construir las reglas de descuento incluyendo, dentro de la propia fábrica, lógica de validación de dichas reglas (por ejemplo, comprobar que una regla fuera aplicable) además de su ensamblado. | Se rechazó el diseño porque una fábrica debe limitarse a instanciar la regla de descuento correcta de acuerdo con la política de descuentos vigente (a partir del tipo de descuento), sin asumir responsabilidades de validación de negocio. Mezclar creación y validación en una misma clase viola el principio de responsabilidad única (SRP), acopla dos preocupaciones que deben evolucionar de forma independiente, y dificulta probar cada una de forma aislada (una prueba de la fábrica termina verificando también reglas de validación que no le corresponden). Se corrigió separando la validación hacia la política/regla de dominio correspondiente, dejando la fábrica exclusivamente como responsable de la creación/ensamblado de las reglas de descuento. |
